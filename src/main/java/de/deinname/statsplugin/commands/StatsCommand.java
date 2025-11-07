@@ -18,6 +18,7 @@ import java.util.Arrays;
 import java.util.List;
 
 public class StatsCommand implements CommandExecutor, TabCompleter {
+
     private final StatsManager statsManager;   // Beibehaltener Name für Kompatibilität
     private final ManaManager manaManager;     // optional, darf null sein
 
@@ -54,13 +55,19 @@ public class StatsCommand implements CommandExecutor, TabCompleter {
         String sub = args[0].toLowerCase();
 
         // /stats <spieler>
-        if (args.length == 1 && !sub.equals("set") && !sub.equals("reset")
-                && !sub.equals("save") && !sub.equals("allocate") && !sub.equals("resetskills")) {
+        if (args.length == 1
+                && !sub.equals("set")
+                && !sub.equals("reset")
+                && !sub.equals("save")
+                && !sub.equals("allocate")
+                && !sub.equals("resetskills")) {
+
             Player target = Bukkit.getPlayer(args[0]);
             if (target == null) {
                 player.sendMessage("§cSpieler nicht gefunden!");
                 return true;
             }
+
             // Header für Zielspieler
             printHpManaHeader(target);
             PlayerStats stats = statsManager.getStats(target);
@@ -86,7 +93,10 @@ public class StatsCommand implements CommandExecutor, TabCompleter {
                 Player target = player;
                 if (args.length >= 4) {
                     target = Bukkit.getPlayer(args[3]);
-                    if (target == null) { player.sendMessage("§cSpieler nicht gefunden!"); return true; }
+                    if (target == null) {
+                        player.sendMessage("§cSpieler nicht gefunden!");
+                        return true;
+                    }
                 }
 
                 String stat = args[1].toLowerCase();
@@ -104,21 +114,35 @@ public class StatsCommand implements CommandExecutor, TabCompleter {
                     case "critchance", "crit" -> s.setCritChance(value);
                     case "critdamage", "critdmg" -> s.setCritDamage(value);
                     case "range" -> s.setRange(value);
-                    case "health", "hp" -> { s.setHealth(value); statsManager.applyHealth(target); }
+                    case "health", "hp" -> {
+                        s.setHealth(value);
+                        statsManager.applyHealth(target);
+                    }
                     case "armor" -> s.setArmor(value);
                     case "attackspeed", "aps" -> s.setAttackSpeed(value);
-                    default -> { player.sendMessage("§cUnbekannter Stat! Verfügbar: damage, critchance, critdamage, range, health, armor, attackspeed"); return true; }
+                    default -> {
+                        player.sendMessage("§cUnbekannter Stat! Verfügbar: damage, critchance, "
+                                + "critdamage, range, health, armor, attackspeed");
+                        return true;
+                    }
                 }
                 player.sendMessage("§a" + stat + " von " + target.getName() + " auf " + value + " gesetzt!");
                 return true;
             }
 
             case "reset": {
-                if (!player.hasPermission("stats.admin")) { player.sendMessage("§cKeine Berechtigung!"); return true; }
+                if (!player.hasPermission("stats.admin")) {
+                    player.sendMessage("§cKeine Berechtigung!");
+                    return true;
+                }
                 Player target = player;
                 if (args.length >= 2) {
                     Player t = Bukkit.getPlayer(args[1]);
-                    if (t != null) target = t; else { player.sendMessage("§cSpieler nicht gefunden!"); return true; }
+                    if (t != null) target = t;
+                    else {
+                        player.sendMessage("§cSpieler nicht gefunden!");
+                        return true;
+                    }
                 }
                 statsManager.resetStats(target);
                 player.sendMessage("§aStats von " + target.getName() + " zurückgesetzt!");
@@ -126,13 +150,19 @@ public class StatsCommand implements CommandExecutor, TabCompleter {
             }
 
             case "save": {
-                if (!player.hasPermission("stats.admin")) { player.sendMessage("§cKeine Berechtigung!"); return true; }
+                if (!player.hasPermission("stats.admin")) {
+                    player.sendMessage("§cKeine Berechtigung!");
+                    return true;
+                }
                 if (args.length == 1) {
                     statsManager.saveAll();
                     player.sendMessage("§aAlle Stats gespeichert!");
                 } else {
                     Player target = Bukkit.getPlayer(args[1]);
-                    if (target == null) { player.sendMessage("§cSpieler nicht gefunden!"); return true; }
+                    if (target == null) {
+                        player.sendMessage("§cSpieler nicht gefunden!");
+                        return true;
+                    }
                     statsManager.saveStats(target.getUniqueId());
                     player.sendMessage("§aStats von " + target.getName() + " gespeichert!");
                 }
@@ -141,13 +171,23 @@ public class StatsCommand implements CommandExecutor, TabCompleter {
 
             case "allocate": {
                 PlayerLevel level = statsManager.getLevel(player);
-                if (level == null) { player.sendMessage("§cLevel-Daten fehlen."); return true; }
-                if (args.length < 2) { player.sendMessage("§cNutzung: /stats allocate <stat> [menge]"); return true; }
+                if (level == null) {
+                    player.sendMessage("§cLevel-Daten fehlen.");
+                    return true;
+                }
+                if (args.length < 2) {
+                    player.sendMessage("§cNutzung: /stats allocate <stat> [menge]");
+                    return true;
+                }
                 String stat = args[1];
                 int amount = 1;
                 if (args.length >= 3) {
-                    try { amount = Math.max(1, Integer.parseInt(args[2])); }
-                    catch (NumberFormatException e) { player.sendMessage("§cUngültige Zahl!"); return true; }
+                    try {
+                        amount = Math.max(1, Integer.parseInt(args[2]));
+                    } catch (NumberFormatException e) {
+                        player.sendMessage("§cUngültige Zahl!");
+                        return true;
+                    }
                 }
                 if (level.allocateSkillPoint(stat, amount)) {
                     statsManager.applyHealth(player);
@@ -157,14 +197,19 @@ public class StatsCommand implements CommandExecutor, TabCompleter {
 
             case "resetskills": {
                 PlayerLevel level = statsManager.getLevel(player);
-                if (level == null) { player.sendMessage("§cLevel-Daten fehlen."); return true; }
+                if (level == null) {
+                    player.sendMessage("§cLevel-Daten fehlen.");
+                    return true;
+                }
                 level.resetSkillPoints();
                 statsManager.applyHealth(player);
                 return true;
             }
 
             default:
-                player.sendMessage("§cNutzung: /stats [spieler] | /stats set <stat> <wert> [spieler] | /stats reset [spieler] | /stats save [spieler] | /stats allocate <stat> [menge] | /stats resetskills");
+                player.sendMessage("§cNutzung: /stats [spieler] | /stats set <stat> <wert> [spieler] | "
+                        + "/stats reset [spieler] | /stats save [spieler] | "
+                        + "/stats allocate <stat> [menge] | /stats resetskills");
                 return true;
         }
     }
@@ -174,7 +219,7 @@ public class StatsCommand implements CommandExecutor, TabCompleter {
         int hp = (int) Math.round(p.getHealth());
         int hpMax = (int) Math.round(p.getMaxHealth());
         Component lineHp = Component.text()
-                .append(Component.text("❤️ ", NamedTextColor.RED))
+                .append(Component.text("HP ", NamedTextColor.RED))
                 .append(Component.text(hp + "/" + hpMax))
                 .build();
         p.sendMessage(lineHp);
@@ -185,7 +230,7 @@ public class StatsCommand implements CommandExecutor, TabCompleter {
             int mMax = (int) Math.round(manaManager.getMax(p));
             double regen = manaManager.getRegen(p);
             Component lineMana = Component.text()
-                    .append(Component.text("🔵 ", NamedTextColor.BLUE))
+                    .append(Component.text("Mana ", NamedTextColor.BLUE))
                     .append(Component.text(m + "/" + mMax + " (" + trim1(regen) + "/s)"))
                     .build();
             p.sendMessage(lineMana);

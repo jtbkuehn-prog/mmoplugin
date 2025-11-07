@@ -16,6 +16,9 @@ import de.deinname.statsplugin.items.ItemStatKeys;
 import de.deinname.statsplugin.items.ItemStatUtils;
 import de.deinname.statsplugin.listeners.ItemRecalcListener;
 import de.deinname.statsplugin.mana.ManaManager;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+
 
 public class StatsPlugin extends JavaPlugin {
     private StatsManager statsManager;
@@ -66,16 +69,20 @@ public class StatsPlugin extends JavaPlugin {
         getServer().getScheduler().runTaskTimer(this, () -> {
             for (var p : getServer().getOnlinePlayers()) {
                 manaManager.tick(p);
-                int hp = (int)Math.ceil(p.getHealth());
-                int hpMax = (int)Math.ceil(p.getMaxHealth());
-                int m = (int)Math.ceil(manaManager.get(p));
-                int mMax = (int)Math.ceil(manaManager.getMax(p));
-                var bar = net.kyori.adventure.text.Component.text()
-                        .append(net.kyori.adventure.text.Component.text("❤️ ", net.kyori.adventure.text.format.NamedTextColor.RED))
-                        .append(net.kyori.adventure.text.Component.text(hp+"/"+hpMax+" "))
-                        .append(net.kyori.adventure.text.Component.text("🔵 ", net.kyori.adventure.text.format.NamedTextColor.BLUE))
-                        .append(net.kyori.adventure.text.Component.text(m+"/"+mMax))
+
+                int hp = (int) Math.ceil(p.getHealth());
+                int hpMax = (int) Math.ceil(p.getMaxHealth());
+                int m = (int) Math.ceil(manaManager.get(p));
+                int mMax = (int) Math.ceil(manaManager.getMax(p));
+
+                Component bar = Component.text()
+                        .append(Component.text("HP ", NamedTextColor.RED))
+                        .append(Component.text(hp + "/" + hpMax))
+                        .append(Component.text("   |   "))
+                        .append(Component.text("Mana ", NamedTextColor.BLUE))
+                        .append(Component.text(m + "/" + mMax))
                         .build();
+
                 p.sendActionBar(bar);
             }
         }, 0L, 10L);
