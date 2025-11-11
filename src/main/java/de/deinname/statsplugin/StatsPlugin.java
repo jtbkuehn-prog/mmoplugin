@@ -73,13 +73,10 @@ public class StatsPlugin extends JavaPlugin {
             getLogger().warning("Command 'stats' nicht in plugin.yml gefunden!");
         }
 
-        var itemCmd = new ItemAdminCommand(itemKeys);
-        if (getCommand("itemadmin") != null) {
-            getCommand("itemadmin").setExecutor(itemCmd);
-            getCommand("itemadmin").setTabCompleter(itemCmd);
-        } else {
-            getLogger().warning("Command 'itemadmin' nicht in plugin.yml gefunden!");
-        }
+        var itemCmd = new ItemAdminCommand(this, statsManager, manaManager, itemKeys);
+        getCommand("itemadmin").setExecutor(itemCmd);
+        getCommand("itemadmin").setTabCompleter(itemCmd);
+
 
         // HUD & Mana-Regen (alle 10 Ticks)
         getServer().getScheduler().runTaskTimer(this, () -> {
