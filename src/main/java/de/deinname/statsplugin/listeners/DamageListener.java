@@ -3,6 +3,7 @@ package de.deinname.statsplugin.listeners;
 import de.deinname.statsplugin.PlayerStats;
 import de.deinname.statsplugin.StatsManager;
 import de.deinname.statsplugin.abilities.DamageBoostState;
+import de.deinname.statsplugin.combat.CustomReach;
 import de.deinname.statsplugin.util.DamageNumbers;
 import org.bukkit.Particle;
 import org.bukkit.entity.LivingEntity;
@@ -15,74 +16,73 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
+/**
+ * Zentraler Schaden:
+ * - Prüft zuerst Extended-Reach-Override (CustomReach).
+ * - Wenn kein Override: klassischer Range-Check mit Eye->Center.
+ * - Danach Crit, Armor, DamageBoost und final setDamage.
+ */
 public class DamageListener implements Listener {
 
     private final StatsManager statsManager;
     private final DamageNumbers numbers;
+
+    // klassische Vanilla-Obergrenze, nur als Info
+    private static final double VANILLA_REACH_FUZZ = 4.5;
 
     public DamageListener(StatsManager statsManager, DamageNumbers numbers) {
         this.statsManager = statsManager;
         this.numbers = numbers;
     }
 
-    /**
-     * Vanilla-Treffer abfangen und unseren Schaden setzen.
-     * Priorität HIGHEST, damit wir nach der Vanilla-Berechnung dran sind,
-     * aber noch vor MONITOR-Listenern (z. B. DamageNumbers-Anzeigen).
-     */
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    // Früh rein, damit Range/Overrides vor Rest greifen
+    @EventHandler(priority = EventPriority.LOWEST)
     public void onDamage(EntityDamageByEntityEvent e) {
         if (!(e.getDamager() instanceof Player attacker)) return;
         if (!(e.getEntity() instanceof LivingEntity victim)) return;
 
-        // Stats des Angreifers holen
         PlayerStats atk = statsManager.getStats(attacker);
         if (atk == null) return;
 
-        // Range-Check (Abbruch + Meldung, wenn zu weit)
-        double dist = attacker.getLocation().distance(victim.getLocation());
-        if (dist > atk.getRange()) {
-            e.setCancelled(true);
-            attacker.sendMessage("§cZu weit entfernt! (Max: " +
-                    String.format("%.1f", atk.getRange()) +
-                    " | Aktuell: " + String.format("%.1f", dist) + ")");
-            return;
-        }
+        // --- 1) Extended-Reach-Override? ---
+        boolean allowExtended = CustomReach.consumeIfMatches(attacker.getUniqueId(), victim);
 
-        // Crit-Roll (CritChance in %)
-        boolean crit = rollCrit(atk.getCritChance());
-
-        // Basis-Schaden berechnen
-        double damage = atk.getDamage();
-        if (crit) {
-            damage *= (1.0 + atk.getCritDamage() / 100.0);
-        }
-
-        // Rüstung des Ziels (wenn Spieler) einfach abziehen (sehr simple Formel)
-        if (victim instanceof Player def) {
-            PlayerStats defStats = statsManager.getStats(def);
-            if (defStats != null) {
-                // simple armor mitigation (linear): damage -= armor
-                damage = Math.max(0.0, damage - defStats.getArmor());
+        // --- 2) Range-Check (Eye -> Center), nur wenn KEIN Override ---
+        if (!allowExtended) {
+            double dist = attacker.getEyeLocation().distance(victim.getLocation().add(0, victim.getHeight() * 0.5, 0));
+            if (dist > atk.getRange()) {
+                e.setCancelled(true);
+                attacker.sendActionBar(net.kyori.adventure.text.Component.text(
+                        "Zu weit: " + String.format("%.1f", dist) + " / " + String.format("%.1f", atk.getRange())
+                ));
+                return;
             }
         }
 
-        // >>> Damage-Boost korrekt anwenden (KEIN 'finalDamage' mehr!)
+        // --- 3) Eigene Schadensberechnung ---
+        boolean crit = rollCrit(atk.getCritChance());
+        double damage = atk.getDamage();
+        if (crit) damage *= (1.0 + atk.getCritDamage() / 100.0);
+
+        if (victim instanceof Player def) {
+            PlayerStats defStats = statsManager.getStats(def);
+            if (defStats != null) damage = Math.max(0.0, damage - defStats.getArmor());
+        }
+
+        // Damage-Boost anwenden
         UUID aid = attacker.getUniqueId();
         if (DamageBoostState.isActive(aid)) {
             damage *= DamageBoostState.getMultiplier(aid);
         }
 
-        // Final auf Event setzen
+        // --- 4) Final setzen ---
         e.setDamage(Math.max(0.0, damage));
 
-        // Floating numbers & optional Crit-Particle
+        // --- 5) Feedback ---
         numbers.show(victim.getWorld(), victim.getLocation(), damage, crit);
         if (crit) {
-            victim.getWorld().spawnParticle(
-                    Particle.CRIT, victim.getLocation().add(0, 1, 0),
-                    25, 0.4, 0.4, 0.4, 0.05
-            );
+            victim.getWorld().spawnParticle(Particle.CRIT, victim.getLocation().add(0, 1, 0),
+                    25, 0.4, 0.4, 0.4, 0.05);
         }
     }
 

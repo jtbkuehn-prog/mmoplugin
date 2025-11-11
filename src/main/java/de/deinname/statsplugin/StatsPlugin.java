@@ -93,10 +93,10 @@ public class StatsPlugin extends JavaPlugin {
                 int mMax = (int) Math.ceil(manaManager.getMax(p));
 
                 Component bar = Component.text()
-                        .append(Component.text("HP ", NamedTextColor.RED))
+                        .append(Component.text("❤HP ", NamedTextColor.RED))
                         .append(Component.text(hp + "/" + hpMax))
                         .append(Component.text("   |   "))
-                        .append(Component.text("Mana ", NamedTextColor.BLUE))
+                        .append(Component.text("✪Mana ", NamedTextColor.BLUE))
                         .append(Component.text(m + "/" + mMax))
                         .build();
 

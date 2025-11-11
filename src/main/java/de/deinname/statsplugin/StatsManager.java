@@ -80,7 +80,6 @@ public class StatsManager {
     public void applyHealth(Player player) {
         PlayerStats stats = getStats(player);
         player.setMaxHealth(stats.getHealth());
-        player.setHealth(stats.getHealth());
     }
 
     // Alle Stats zurücksetzen
