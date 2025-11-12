@@ -10,6 +10,7 @@ import de.deinname.statsplugin.mana.ManaManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -21,6 +22,9 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
+import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.text.format.TextColor;
+
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -110,7 +114,11 @@ public class ItemAdminCommand implements CommandExecutor, TabCompleter {
     private TextColor loreColor(String key, String defHex) {
         String path = "lore_colors." + key;
         String hex = plugin.getConfig().getString(path, defHex);
-        try { return TextColor.fromHexString(hex); } catch (Exception e) { return TextColor.fromHexString(defHex); }
+        try {
+            return TextColor.fromHexString(hex);
+        } catch (Exception e) {
+            return TextColor.fromHexString(defHex);
+        }
     }
 
     private boolean handleSetAbility(Player p, String[] args) {
@@ -160,7 +168,8 @@ public class ItemAdminCommand implements CommandExecutor, TabCompleter {
         String plainName = meta.hasDisplayName()
                 ? PlainTextComponentSerializer.plainText().serialize(meta.displayName())
                 : hand.getType().name();
-        meta.displayName(Component.text(plainName, color));
+        meta.displayName(Component.text(plainName, color)
+                .decoration(TextDecoration.ITALIC, false));
 
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
         meta.setAttributeModifiers(null);
@@ -180,7 +189,8 @@ public class ItemAdminCommand implements CommandExecutor, TabCompleter {
 
         TextColor color = resolveStoredColor(meta.getPersistentDataContainer());
         if (color == null) color = TextColor.fromHexString("#FFFFFF");
-        meta.displayName(Component.text(name, color));
+        meta.displayName(Component.text(name, color)
+                .decoration(TextDecoration.ITALIC, false));
 
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
         hand.setItemMeta(meta);
@@ -257,44 +267,71 @@ public class ItemAdminCommand implements CommandExecutor, TabCompleter {
         if (is == null || !is.hasItemMeta()) return;
         ItemMeta meta = is.getItemMeta();
 
+        // 1) Vanilla-Attribute verstecken & Modifier entfernen
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
         meta.setAttributeModifiers(null);
 
+        // 2) Stats lesen
         ItemStats s = ItemStatUtils.read(is, keys);
         List<Component> lore = new ArrayList<>();
-        addLineColored(lore, s.damage(),     "+%s Damage",        loreColor("damage",     "#BBBBBB"));
-        addLineColored(lore, s.critChance(), "+%s%% Crit Chance", loreColor("critchance", "#BBBBBB"));
-        addLineColored(lore, s.critDamage(), "+%s%% Crit Damage", loreColor("critdamage", "#BBBBBB"));
-        addLineColored(lore, s.health(),     "+%s Health",        loreColor("health",     "#BBBBBB"));
-        addLineColored(lore, s.armor(),      "+%s Armor",         loreColor("armor",      "#BBBBBB"));
-        addLineColored(lore, s.range(),      "+%s Range",         loreColor("range",      "#BBBBBB"));
-        addLineColored(lore, s.manaMax(),    "+%s Mana",          loreColor("mana",       "#BBBBBB"));
-        addLineColored(lore, s.manaRegen(),  "+%s Mana Regeneration/s", loreColor("manaregen", "#BBBBBB"));
 
+        // Farb-Config holen
+        TextColor colDamage     = loreColor("damage",     "#FF5555");
+        TextColor colCritChance = loreColor("critchance", "#55FFFF");
+        TextColor colCritDamage = loreColor("critdamage", "#FFD700");
+        TextColor colHealth     = loreColor("health",     "#FF5555");
+        TextColor colArmor      = loreColor("armor",      "#AAAAAA");
+        TextColor colRange      = loreColor("range",      "#55FF55");
+        TextColor colMana       = loreColor("mana",       "#00AAFF");
+        TextColor colManaRegen  = loreColor("manaregen",  "#00AAFF");
+        TextColor colCustom     = loreColor("custom",     "#BFBFBF");
 
-        List<String> custom = readCustomLore(meta.getPersistentDataContainer());
-        if (!custom.isEmpty()) {
-            lore.add(Component.text(""));
-            for (String line : custom) lore.add(Component.text(line, NamedTextColor.GRAY));
+        // 3) Stat-Zeilen farbig + nicht-kursiv
+        addLineColored(lore, s.damage(),     "+%s Damage",              colDamage);
+        addLineColored(lore, s.critChance(), "+%s%% Crit Chance",       colCritChance);
+        addLineColored(lore, s.critDamage(), "+%s%% Crit Damage",       colCritDamage);
+        addLineColored(lore, s.health(),     "+%s Health",              colHealth);
+        addLineColored(lore, s.armor(),      "+%s Armor",               colArmor);
+        addLineColored(lore, s.range(),      "+%s Range",               colRange);
+        addLineColored(lore, s.manaMax(),    "+%s Mana",                colMana);
+        addLineColored(lore, s.manaRegen(),  "+%s Mana Regeneration/s", colManaRegen);
+
+        // 4) Custom-Lore aus PDC (andere Variable! z. B. customLines)
+        List<String> customLines = readCustomLore(meta.getPersistentDataContainer());
+        if (!customLines.isEmpty()) {
+            lore.add(Component.text("").decoration(TextDecoration.ITALIC, false)); // Separator
+            for (String line : customLines) {
+                lore.add(Component.text(line)
+                        .color(colCustom)
+                        .decoration(TextDecoration.ITALIC, false));
+            }
         }
 
-        // Name ggf. anhand gespeicherter Rarity/HEX einfärben
-        TextColor color = resolveStoredColor(meta.getPersistentDataContainer());
-        if (color != null) {
+        // 5) Name ggf. anhand gespeicherter Rarity/HEX einfärben
+        TextColor nameColor = resolveStoredColor(meta.getPersistentDataContainer());
+        if (nameColor != null) {
             String plainName = meta.hasDisplayName()
                     ? PlainTextComponentSerializer.plainText().serialize(meta.displayName())
                     : is.getType().name();
-            meta.displayName(Component.text(plainName, color));
+            meta.displayName(Component.text(plainName, nameColor)
+                    .decoration(TextDecoration.ITALIC, false));
         }
 
         meta.lore(lore);
         is.setItemMeta(meta);
     }
 
+
+
+
     private void addLineColored(List<Component> lore, double v, String fmt, TextColor color) {
         if (Math.abs(v) < 1e-9) return;
-        lore.add(Component.text(formatNumber(v, fmt)).color(color));
+        String txt = formatNumber(v, fmt);
+        lore.add(Component.text(txt)
+                .color(color)
+                .decoration(TextDecoration.ITALIC, false)); // <<< wichtig
     }
+
 
     private Component textColored(String s, TextColor color) {
         return Component.text(s).color(color);
@@ -328,6 +365,13 @@ public class ItemAdminCommand implements CommandExecutor, TabCompleter {
         if (raw == null || raw.isEmpty()) return new ArrayList<>();
         return new ArrayList<>(Arrays.asList(raw.split("\n", -1)));
     }
+
+    private void addCustomLine(List<Component> lore, String line, TextColor color) {
+        lore.add(Component.text(line)
+                .color(color)
+                .decoration(TextDecoration.ITALIC, false)); // <<< wichtig
+    }
+
 
     private void writeCustomLore(PersistentDataContainer pdc, List<String> lines) {
         String raw = String.join("\n", lines);
