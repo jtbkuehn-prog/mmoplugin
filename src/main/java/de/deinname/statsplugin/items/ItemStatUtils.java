@@ -24,7 +24,9 @@ public final class ItemStatUtils {
                 get(pdc, keys.ARMOR),
                 get(pdc, keys.RANGE),
                 get(pdc, keys.MANA_MAX),
-                get(pdc, keys.MANA_REGEN)
+                get(pdc, keys.MANA_REGEN),
+                get(pdc, keys.HEALTH_REGEN),
+                get(pdc, keys.ATTACKSPEED)
         );
     }
 

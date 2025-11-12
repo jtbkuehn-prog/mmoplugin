@@ -6,6 +6,8 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
 
 public class StatsManager {
     private final Map<UUID, PlayerStats> playerStats;
@@ -23,7 +25,7 @@ public class StatsManager {
     }
 
     // Merker für zuletzt angewendete Item-Boni
-    private static final class ItemBonus { double d, cc, cd, hp, ar, rg; ItemBonus(double d,double cc,double cd,double hp,double ar,double rg){this.d=d;this.cc=cc;this.cd=cd;this.hp=hp;this.ar=ar;this.rg=rg;} }
+    private static final class ItemBonus { double d, cc, cd, hp, ar, rg, as; ItemBonus(double d,double cc,double cd,double hp,double ar,double rg, double as){this.d=d;this.cc=cc;this.cd=cd;this.hp=hp;this.ar=ar;this.rg=rg;this.as=as;} }
     private final java.util.Map<java.util.UUID, ItemBonus> lastItemBonus = new java.util.HashMap<>();
 
     // Lädt oder erstellt Stats für einen Spieler
@@ -76,6 +78,11 @@ public class StatsManager {
         }
     }
 
+    private final Map<UUID, Double> healthRegen = new ConcurrentHashMap<>();
+    public double getHealthRegen(UUID id) { return healthRegen.getOrDefault(id, 0.0); }
+    public void setHealthRegen(UUID id, double v) { healthRegen.put(id, Math.max(0.0, v)); }
+
+
     // Setzt Health des Spielers basierend auf Stats
     public void applyHealth(Player player) {
         PlayerStats stats = getStats(player);
@@ -125,16 +132,17 @@ public class StatsManager {
         }
     }
 
-    public void applyItemBonuses(java.util.UUID id, double damage, double critC, double critD, double health, double armor, double range){
+    public void applyItemBonuses(java.util.UUID id, double damage, double critC, double critD, double health, double armor, double range, double attackspeed){
         PlayerStats s = playerStats.get(id);
         if (s == null) return;
-        ItemBonus prev = lastItemBonus.getOrDefault(id, new ItemBonus(0,0,0,0,0,0));
+        ItemBonus prev = lastItemBonus.getOrDefault(id, new ItemBonus(0,0,0,0,0,0,0));
         double dDamage = damage - prev.d;
         double dCritC = critC - prev.cc;
         double dCritD = critD - prev.cd;
         double dHealth = health - prev.hp;
         double dArmor = armor - prev.ar;
         double dRange = range - prev.rg;
+        double dAttackspeed = attackspeed - prev.rg;
 
 
         if (dDamage != 0) s.addDamage(dDamage);
@@ -143,9 +151,10 @@ public class StatsManager {
         if (dArmor != 0) s.addArmor(dArmor);
         if (dRange != 0) s.addRange(dRange);
         if (dHealth != 0) s.addHealth(dHealth);
+        if (dAttackspeed != 0) s.addAttackSpeed(dAttackspeed);
 
 
-        lastItemBonus.put(id, new ItemBonus(damage, critC, critD, health, armor, range));
+        lastItemBonus.put(id, new ItemBonus(damage, critC, critD, health, armor, range, attackspeed));
     }
 
 }

@@ -35,4 +35,6 @@ lore_colors:
   range:       "#55FF55"
   mana:        "#00AAFF"
   manaregen:   "#00AAFF"
-  custom:      "#BFBFBF"  # 👈 das ist der fehlende Key
+  custom:      "#BFBFBF"
+  healthregen: "#FF7777"
+  attackspeed: "#FF7777"

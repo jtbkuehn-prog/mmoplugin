@@ -95,7 +95,7 @@ public class ItemRecalcListener implements Listener {
         // Item-Boni in Stats einspeisen (Delta-Logik im StatsManager)
         stats.applyItemBonuses(p.getUniqueId(),
                 total.damage(), total.critChance(), total.critDamage(),
-                total.health(), total.armor(), total.range());
+                total.health(), total.armor(), total.range(), total.attackspeed());
 
         // >>> NEU/WICHTIG: Spieler-MaxHealth sofort aktualisieren
         stats.applyHealth(p);  // <— diese Zeile sorgt dafür, dass Health sofort wirkt
@@ -103,6 +103,8 @@ public class ItemRecalcListener implements Listener {
         // Mana: niemals stapeln – immer base + items
         mana.setMax(p,   baseMax   + total.manaMax());
         mana.setRegen(p, baseRegen + total.manaRegen());
+
+        stats.setHealthRegen(p.getUniqueId(), total.healthRegen());
 
         // optionales Feedback
         p.sendActionBar(Component.text("Stats aktualisiert", NamedTextColor.GREEN));

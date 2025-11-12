@@ -13,6 +13,9 @@ public class PlayerStats {
     private double health;
     private double armor;
     private double attackSpeed;
+    private double mana;
+    private double manaregen;
+    private double healthregen;
 
     public PlayerStats(UUID playerId) {
         this.playerId = playerId;
@@ -24,6 +27,9 @@ public class PlayerStats {
         this.health = 20.0;
         this.armor = 0.0;
         this.attackSpeed = 2.0;
+        this.mana = 50.0;
+        this.manaregen = 2.0;
+        this.healthregen = 2.0;
     }
 
     // Getter
@@ -35,6 +41,9 @@ public class PlayerStats {
     public double getHealth() { return health; }
     public double getArmor() { return armor; }
     public double getAttackSpeed() { return attackSpeed; }
+    public double getMana() { return mana; }
+    public double getManaregen() { return manaregen; }
+    public double getHealthregen() { return healthregen; }
 
     // Setter
     public void setDamage(double damage) { this.damage = damage; }
@@ -44,6 +53,9 @@ public class PlayerStats {
     public void setHealth(double health) { this.health = Math.max(1, health); }
     public void setArmor(double armor) { this.armor = armor; }
     public void setAttackSpeed(double attackSpeed) { this.attackSpeed = Math.max(0.1, attackSpeed); }
+    public void setMana(double mana) { this.mana = Math.max(0.1, mana); }
+    public void setManaregen(double manaregen) { this.manaregen = Math.max(0.1, manaregen); }
+    public void setHealthregen(double healthregen) { this.healthregen = Math.max(0.1, healthregen); }
 
     // Add/Remove Methoden für Items/Buffs
     public void addDamage(double amount) { this.damage += amount; }
@@ -55,6 +67,9 @@ public class PlayerStats {
     public void addHealth(double amount) { this.health += amount; }
     public void addArmor(double amount) { this.armor += amount; }
     public void addAttackSpeed(double amount) { setAttackSpeed(this.attackSpeed + amount); }
+    public void addMana(double amount) { setMana(this.mana + amount); }
+    public void addManaregen(double amount) { setManaregen(this.manaregen + amount); }
+    public void addHealthregen(double amount) { setHealthregen(this.healthregen + amount); }
 
     // Berechnet ob ein Crit erfolgt
     public boolean rollCrit() {
@@ -87,7 +102,10 @@ public class PlayerStats {
                         "§bRange: §f%.1f\n" +
                         "§aHealth: §f%.1f\n" +
                         "§7Armor: §f%.1f",
-                damage, critChance, critDamage, attackSpeed, range, health, armor
+                        "§7Mana: §f%.1f",
+                        "§7Manaregen: §f%.1f",
+                        "§7Healthregen: §f%.1f",
+                damage, critChance, critDamage, attackSpeed, range, health, armor, mana, manaregen, healthregen
         );
     }
 

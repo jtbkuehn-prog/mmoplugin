@@ -120,6 +120,9 @@ public class StatsCommand implements CommandExecutor, TabCompleter {
                     }
                     case "armor" -> s.setArmor(value);
                     case "attackspeed", "aps" -> s.setAttackSpeed(value);
+                    case "mana", "ma" -> s.setAttackSpeed(value);
+                    case "manaregen", "manareg" -> s.setAttackSpeed(value);
+                    case "healthregen", "healthreg" -> s.setAttackSpeed(value);
                     default -> {
                         player.sendMessage("§cUnbekannter Stat! Verfügbar: damage, critchance, "
                                 + "critdamage, range, health, armor, attackspeed");
@@ -251,7 +254,7 @@ public class StatsCommand implements CommandExecutor, TabCompleter {
             completions.addAll(Arrays.asList("set", "reset", "save", "allocate", "resetskills"));
             Bukkit.getOnlinePlayers().forEach(p -> completions.add(p.getName()));
         } else if (args.length == 2 && args[0].equalsIgnoreCase("set")) {
-            completions.addAll(Arrays.asList("damage", "critchance", "critdamage", "range", "health", "armor", "attackspeed"));
+            completions.addAll(Arrays.asList("damage", "critchance", "critdamage", "range", "health", "armor", "attackspeed","mana","manaregen","healthregen"));
         } else if (args.length == 3 && args[0].equalsIgnoreCase("set")) {
             completions.add("<wert>");
         } else if (args.length == 2 && args[0].equalsIgnoreCase("reset")) {
@@ -259,7 +262,7 @@ public class StatsCommand implements CommandExecutor, TabCompleter {
         } else if (args.length == 2 && args[0].equalsIgnoreCase("save")) {
             Bukkit.getOnlinePlayers().forEach(p -> completions.add(p.getName()));
         } else if (args.length == 2 && args[0].equalsIgnoreCase("allocate")) {
-            completions.addAll(Arrays.asList("health","damage","armor","critchance","critdamage","range","attackspeed"));
+            completions.addAll(Arrays.asList("health","damage","armor","critchance","critdamage","range","attackspeed","mana","manaregen","healthregen"));
         } else if (args.length == 3 && args[0].equalsIgnoreCase("allocate")) {
             completions.add("<menge>");
         }

@@ -15,9 +15,10 @@ public final class ItemStatKeys {
     public final NamespacedKey MANA_MAX;
     public final NamespacedKey MANA_REGEN;
     public final NamespacedKey ABILITY; // z.B. "damage_boost"
+    public final NamespacedKey HEALTH_REGEN;
+    public final NamespacedKey ATTACKSPEED;
 
-
-    public ItemStatKeys(Plugin plugin){
+    public ItemStatKeys(org.bukkit.plugin.java.JavaPlugin plugin) {
         DAMAGE = new NamespacedKey(plugin, "damage");
         CRIT_CHANCE = new NamespacedKey(plugin, "crit_chance");
         CRIT_DAMAGE = new NamespacedKey(plugin, "crit_damage");
@@ -27,5 +28,7 @@ public final class ItemStatKeys {
         MANA_MAX = new NamespacedKey(plugin, "mana_max");
         MANA_REGEN = new NamespacedKey(plugin, "mana_regen");
         ABILITY = new NamespacedKey(plugin, "ability");
+        HEALTH_REGEN = new NamespacedKey(plugin, "health_regen");
+        ATTACKSPEED = new NamespacedKey(plugin, "attackspeed");
     }
 }

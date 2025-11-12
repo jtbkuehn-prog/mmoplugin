@@ -57,6 +57,9 @@ public class StatsStorage {
             json.addProperty("range", stats.getRange());
             json.addProperty("health", stats.getHealth());
             json.addProperty("armor", stats.getArmor());
+            json.addProperty("mana", stats.getMana());
+            json.addProperty("manareg", stats.getManaregen());
+            json.addProperty("healthreg", stats.getHealthregen());
             json.addProperty("lastSaved", System.currentTimeMillis());
 
             // Speichern
@@ -95,6 +98,9 @@ public class StatsStorage {
             if (json.has("range")) stats.setRange(json.get("range").getAsDouble());
             if (json.has("health")) stats.setHealth(json.get("health").getAsDouble());
             if (json.has("armor")) stats.setArmor(json.get("armor").getAsDouble());
+            if (json.has("mana")) stats.setArmor(json.get("mana").getAsDouble());
+            if (json.has("manaregen")) stats.setArmor(json.get("manaregen").getAsDouble());
+            if (json.has("healthregen")) stats.setArmor(json.get("healthregen").getAsDouble());
 
             plugin.getLogger().info("✓ Stats erfolgreich geladen für: " + playerId);
             return stats;

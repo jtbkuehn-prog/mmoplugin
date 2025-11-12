@@ -1,10 +1,7 @@
 package de.deinname.statsplugin;
 
 import de.deinname.statsplugin.commands.StatsCommand;
-import de.deinname.statsplugin.listeners.AttackListener;
-import de.deinname.statsplugin.listeners.DamageListener;
-import de.deinname.statsplugin.listeners.PlayerListener;
-import de.deinname.statsplugin.listeners.XPListener;
+import de.deinname.statsplugin.listeners.*;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import de.deinname.statsplugin.util.DamageNumbers;
@@ -13,10 +10,13 @@ import de.deinname.statsplugin.abilities.DamageBoostState;
 //import de.deinname.statsplugin.abilities.DamageBoostApplier; // <— NEU (optional)
 import de.deinname.statsplugin.commands.ItemAdminCommand;
 import de.deinname.statsplugin.items.ItemStatKeys;
-import de.deinname.statsplugin.listeners.ItemRecalcListener;
 import de.deinname.statsplugin.mana.ManaManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.World;
+import org.bukkit.GameRule;
+
 
 public class StatsPlugin extends JavaPlugin {
     private StatsManager statsManager;
@@ -63,6 +63,7 @@ public class StatsPlugin extends JavaPlugin {
         // OPTIONALER „Sicherheitsgurt“: ganz am Ende nochmal multipizieren
         // Falls ein später registrierter Listener den Schaden überschreibt
        // getServer().getPluginManager().registerEvents(new DamageBoostApplier(), this); // <— NEU (optional)
+        getServer().getPluginManager().registerEvents(new FoodAndRegenListener(), this);
 
         // Commands
         var statsCmd = new StatsCommand(statsManager, manaManager);
@@ -98,6 +99,22 @@ public class StatsPlugin extends JavaPlugin {
                         .build();
 
                 p.sendActionBar(bar);
+
+                // ----- Eigene Health-Regeneration (dt = 0.5s pro Ticklauf) -----
+                double regenPerSec = statsManager.getHealthRegen(p.getUniqueId()); // kommt in Schritt 3f
+                if (regenPerSec > 0) {
+                    double dt = 0.5;
+                    double add = regenPerSec * dt;
+                    double max = p.getAttribute(Attribute.MAX_HEALTH).getValue();
+                    double cur = p.getHealth();
+                    double next = Math.min(max, cur + add);
+                    if (next > cur) p.setHealth(next);
+                }
+
+// ----- Hunger ganz aus / „eingefroren“ -----
+                p.setFoodLevel(20);
+                p.setSaturation(20f);
+                p.setExhaustion(0f);
             });
         }, 0L, 10L);
 
@@ -119,6 +136,10 @@ public class StatsPlugin extends JavaPlugin {
         double base = getConfig().getDouble("xp.base", 100.0);
         double mult = getConfig().getDouble("xp.multiplier", 1.15);
         PlayerLevel.configure(max, base, mult);
+
+        for (World w : getServer().getWorlds()) {
+            w.setGameRule(GameRule.NATURAL_REGENERATION, Boolean.FALSE);
+        }
     }
 
     @Override

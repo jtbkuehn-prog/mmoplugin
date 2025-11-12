@@ -23,8 +23,6 @@ public class XPListener implements Listener {
             return;
         }
 
-        // Debug
-        killer.sendMessage("§7[Debug] Du hast " + event.getEntityType() + " getötet!");
 
         // Vanilla XP deaktivieren (wir haben unser eigenes System)
         event.setDroppedExp(0);
@@ -32,19 +30,7 @@ public class XPListener implements Listener {
         // XP basierend auf Mob-Typ
         double xp = getXPForEntity(event.getEntity());
 
-        killer.sendMessage("§7[Debug] XP-Wert: " + xp);
 
-        if (xp > 0) {
-            PlayerLevel level = statsManager.getLevel(killer);
-
-            if (level == null) {
-                killer.sendMessage("§c[Debug] FEHLER: Level ist null!");
-                return;
-            }
-
-            killer.sendMessage("§7[Debug] Füge " + xp + " XP hinzu...");
-            level.addXP(xp);
-        }
     }
 
     // Berechnet XP-Wert für verschiedene Mobs

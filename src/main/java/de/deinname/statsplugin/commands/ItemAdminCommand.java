@@ -103,6 +103,8 @@ public class ItemAdminCommand implements CommandExecutor, TabCompleter {
             case "range"       -> ItemStatUtils.writeStat(hand, keys.RANGE, value);
             case "mana", "manamax" -> ItemStatUtils.writeStat(hand, keys.MANA_MAX, value);
             case "manaregen"   -> ItemStatUtils.writeStat(hand, keys.MANA_REGEN, value);
+            case "healthregen" -> ItemStatUtils.writeStat(hand, keys.HEALTH_REGEN, value);
+            case "attackspeed" -> ItemStatUtils.writeStat(hand, keys.ATTACKSPEED, value);
             default -> { p.sendMessage("§cUnbekannter Stat-Key."); return false; }
         }
 
@@ -147,6 +149,8 @@ public class ItemAdminCommand implements CommandExecutor, TabCompleter {
         ItemStatUtils.writeStat(hand, keys.RANGE, 0);
         ItemStatUtils.writeStat(hand, keys.MANA_MAX, 0);
         ItemStatUtils.writeStat(hand, keys.MANA_REGEN, 0);
+        ItemStatUtils.writeStat(hand, keys.HEALTH_REGEN, 0);
+        ItemStatUtils.writeStat(hand, keys.ATTACKSPEED, 0);
         ItemStatUtils.writeAbility(hand, keys, null);
 
         rebuildLorePreservingCustom(hand);
@@ -251,7 +255,7 @@ public class ItemAdminCommand implements CommandExecutor, TabCompleter {
             // In Stats übernehmen
             stats.applyItemBonuses(p.getUniqueId(),
                     total.damage(), total.critChance(), total.critDamage(),
-                    total.health(), total.armor(), total.range());
+                    total.health(), total.armor(), total.range(), total.attackspeed());
 
             stats.applyHealth(p); // MaxHealth sofort updaten
 
@@ -285,6 +289,8 @@ public class ItemAdminCommand implements CommandExecutor, TabCompleter {
         TextColor colMana       = loreColor("mana",       "#00AAFF");
         TextColor colManaRegen  = loreColor("manaregen",  "#00AAFF");
         TextColor colCustom     = loreColor("custom",     "#BFBFBF");
+        TextColor colHealthRegen     = loreColor("healthregen",     "#FF7777");
+        TextColor colAttackspeed     = loreColor("attackspeed",     "#FF7777");
 
         // 3) Stat-Zeilen farbig + nicht-kursiv
         addLineColored(lore, s.damage(),     "+%s Damage",              colDamage);
@@ -295,6 +301,9 @@ public class ItemAdminCommand implements CommandExecutor, TabCompleter {
         addLineColored(lore, s.range(),      "+%s Range",               colRange);
         addLineColored(lore, s.manaMax(),    "+%s Mana",                colMana);
         addLineColored(lore, s.manaRegen(),  "+%s Mana Regeneration/s", colManaRegen);
+        addLineColored(lore, s.healthRegen(), "+%s Health Regeneration/s", colHealthRegen);
+        addLineColored(lore, s.attackspeed(), "+%s Attackspeed/s", colHealthRegen);
+
 
         // 4) Custom-Lore aus PDC (andere Variable! z. B. customLines)
         List<String> customLines = readCustomLore(meta.getPersistentDataContainer());
@@ -393,7 +402,7 @@ public class ItemAdminCommand implements CommandExecutor, TabCompleter {
             return Arrays.asList("setstat","setability","clear","setrarity","rename","addlore","clearlore");
         }
         if (args.length == 2 && "setstat".equalsIgnoreCase(args[0])) {
-            return Arrays.asList("damage","critchance","critdamage","health","armor","range","mana","manaregen");
+            return Arrays.asList("damage","critchance","critdamage","health","armor","range","mana","manaregen","healthregen","attackspeed");
         }
         if (args.length == 2 && "setrarity".equalsIgnoreCase(args[0])) {
             return rarityMgr.names().stream().map(String::toLowerCase).collect(Collectors.toList());

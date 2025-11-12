@@ -9,9 +9,11 @@ public record ItemStats(
         double armor,
         double range,
         double manaMax,
-        double manaRegen
+        double manaRegen,
+        double healthRegen,
+        double attackspeed
 ) {
-    public static ItemStats zero(){ return new ItemStats(0,0,0,0,0,0,0,0); }
+    public static ItemStats zero(){ return new ItemStats(0,0,0,0,0,0,0,0, 0, 0); }
     public ItemStats add(ItemStats o){
         return new ItemStats(
                 damage + o.damage,
@@ -21,7 +23,9 @@ public record ItemStats(
                 armor + o.armor,
                 range + o.range,
                 manaMax + o.manaMax,
-                manaRegen + o.manaRegen
+                manaRegen + o.manaRegen,
+                healthRegen + o.healthRegen,
+                attackspeed + o.attackspeed
         );
     }
 }
