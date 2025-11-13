@@ -68,6 +68,11 @@ public class StatsPlugin extends JavaPlugin {
         // HUD & Ticks (alle 10 Ticks = 0,5s)
         getServer().getScheduler().runTaskTimer(this, () -> {
             for (var p : getServer().getOnlinePlayers()) {
+
+                if (!p.isOnline() || p.isDead() || p.getHealth() <= 0.0) {
+                    continue;
+                }
+
                 // Mana-Regeneration
                 manaManager.tick(p);
 

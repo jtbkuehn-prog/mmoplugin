@@ -1,10 +1,19 @@
 package de.deinname.statsplugin.listeners;
 
 import de.deinname.statsplugin.StatsManager;
+import org.bukkit.Bukkit;
+import org.bukkit.GameMode;
+import org.bukkit.Location;
+import org.bukkit.World;
+import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
+
+import java.util.UUID;
 
 public class PlayerListener implements Listener {
     private final StatsManager statsManager;
@@ -30,4 +39,5 @@ public class PlayerListener implements Listener {
         statsManager.removeStats(event.getPlayer().getUniqueId());
         event.getPlayer().sendMessage("§aStats gespeichert!");
     }
+
 }
