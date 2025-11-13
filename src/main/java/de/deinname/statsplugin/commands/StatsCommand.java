@@ -5,267 +5,364 @@ import de.deinname.statsplugin.PlayerStats;
 import de.deinname.statsplugin.StatsManager;
 import de.deinname.statsplugin.mana.ManaManager;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
-import org.bukkit.command.CommandSender;
-import org.bukkit.command.TabCompleter;
+import org.bukkit.command.*;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.Plugin;
+import org.bukkit.plugin.java.JavaPlugin;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 public class StatsCommand implements CommandExecutor, TabCompleter {
 
-    private final StatsManager statsManager;   // Beibehaltener Name für Kompatibilität
-    private final ManaManager manaManager;     // optional, darf null sein
+    private final StatsManager statsManager;
+    private final ManaManager manaManager;
 
-    // Alter Konstruktor (kompatibel zu bestehendem Code)
-    public StatsCommand(StatsManager statsManager) {
-        this(statsManager, null);
-    }
-
-    // Neuer Konstruktor (für Mana-Anzeige)
-    public StatsCommand(StatsManager statsManager, ManaManager manaManager) {
+    public StatsCommand(StatsManager statsManager, ManaManager manaManager){
         this.statsManager = statsManager;
         this.manaManager = manaManager;
     }
 
+    // ---------- Helpers (Config) ----------
+    private JavaPlugin getPlugin(){
+        Plugin p = Bukkit.getPluginManager().getPlugin("StatsPlugin");
+        if (p instanceof JavaPlugin jp) return jp;
+        return null;
+    }
+
+    private Map<String, String> labels(){
+        Map<String,String> out = new HashMap<>();
+        out.put("header_stats", "=== Stats ===");
+        out.put("damage","Damage");
+        out.put("critchance","Crit Chance");
+        out.put("critdamage","Crit Damage");
+        out.put("attackspeed","Attack Speed");
+        out.put("range","Range");
+        out.put("health","Health");
+        out.put("armor","Armor");
+        out.put("mana","Mana");
+        out.put("manaregen","Mana Regen");
+        out.put("healthregen","Health Regen");
+        out.put("header_level","=== Level & XP ===");
+        out.put("level","Level");
+        out.put("xp","XP");
+        out.put("skillpoints","Skill Points");
+
+        JavaPlugin pl = getPlugin();
+        if (pl != null){
+            ConfigurationSection sec = pl.getConfig().getConfigurationSection("stats_display.labels");
+            if (sec != null){
+                for (String k : sec.getKeys(false)){
+                    out.put(k.toLowerCase(Locale.ROOT), sec.getString(k));
+                }
+            }
+        }
+        return out;
+    }
+
+    private Map<String, TextColor> colors(){
+        Map<String,TextColor> out = new HashMap<>();
+        out.put("damage",      TextColor.fromHexString("#FF5555"));
+        out.put("critchance",  TextColor.fromHexString("#55FFFF"));
+        out.put("critdamage",  TextColor.fromHexString("#FFD166"));
+        out.put("attackspeed", TextColor.fromHexString("#FFD166"));
+        out.put("range",       TextColor.fromHexString("#55FF55"));
+        out.put("health",      TextColor.fromHexString("#FF4444"));
+        out.put("armor",       TextColor.fromHexString("#AAAAAA"));
+        out.put("mana",        TextColor.fromHexString("#55AAFF"));
+        out.put("manaregen",   TextColor.fromHexString("#55AAFF"));
+        out.put("healthregen", TextColor.fromHexString("#FF77AA"));
+
+        JavaPlugin pl = getPlugin();
+        if (pl != null){
+            ConfigurationSection sec = pl.getConfig().getConfigurationSection("stats_display.colors");
+            if (sec != null){
+                for (String k : sec.getKeys(false)){
+                    try { out.put(k.toLowerCase(Locale.ROOT), TextColor.fromHexString(sec.getString(k))); }
+                    catch (Exception ignored) {}
+                }
+            }
+        }
+        return out;
+    }
+
+    private List<String> order(){
+        List<String> def = Arrays.asList("damage","critchance","critdamage","attackspeed","range","health","armor","mana","manaregen","healthregen");
+        JavaPlugin pl = getPlugin();
+        if (pl != null){
+            List<String> conf = pl.getConfig().getStringList("stats_display.order");
+            if (conf != null && !conf.isEmpty()){
+                List<String> out = new ArrayList<>();
+                for (String s : conf){
+                    String k = s.toLowerCase(Locale.ROOT);
+                    if (def.contains(k)) out.add(k);
+                }
+                return out;
+            }
+        }
+        return def;
+    }
+
+    // ---------- Formatting ----------
+    private Component line(String label, String value, TextColor color){
+        return Component.text(label + ": ")
+                .color(TextColor.fromHexString("#E0E0E0"))
+                .append(Component.text(value).color(color))
+                .decoration(TextDecoration.ITALIC, false);
+    }
+    private Component header(String text){
+        return Component.text(text).color(TextColor.fromHexString("#FFD166")).decoration(TextDecoration.ITALIC,false);
+    }
+    private static String n(double v){
+        if (Math.abs(v - Math.rint(v)) < 1e-9) return String.valueOf((int)Math.rint(v));
+        return String.valueOf(Math.round(v*10.0)/10.0);
+    }
+
+    // ---------- Command ----------
     @Override
-    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (!(sender instanceof Player player)) {
-            sender.sendMessage("§cNur Spieler können diesen Befehl nutzen!");
+    public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
+        if (!(sender instanceof Player self)){ sender.sendMessage("Nur ingame nutzbar."); return true; }
+
+        if (args.length == 0){
+            show(self, self);
             return true;
         }
 
-        // /stats  -> Eigene Übersicht (mit HP/Mana-Header)
-        if (args.length == 0) {
-            printHpManaHeader(player);
-            PlayerStats stats = statsManager.getStats(player);
-            PlayerLevel level = statsManager.getLevel(player);
-            player.sendMessage(stats.toString());
-            player.sendMessage("");
-            player.sendMessage(level.toString());
-            return true;
+        // /stats <player> [sub ...]
+        Player maybe = Bukkit.getPlayerExact(args[0]);
+        if (maybe != null){
+            if (args.length == 1){
+                show(self, maybe);
+                return true;
+            } else {
+                String[] rest = Arrays.copyOfRange(args, 1, args.length);
+                return handleSub(self, maybe, rest);
+            }
         }
 
-        // ab hier gibt es mindestens 1 Argument
-        String sub = args[0].toLowerCase();
-
-        // /stats <spieler>
-        if (args.length == 1
-                && !sub.equals("set")
-                && !sub.equals("reset")
-                && !sub.equals("save")
-                && !sub.equals("allocate")
-                && !sub.equals("resetskills")) {
-
-            Player target = Bukkit.getPlayer(args[0]);
-            if (target == null) {
-                player.sendMessage("§cSpieler nicht gefunden!");
+        String sub = args[0].toLowerCase(Locale.ROOT);
+        switch (sub){
+            case "show":
+            case "get":{
+                Player target = (args.length>=2) ? resolve(self, args[1]) : self;
+                if (target == null){ self.sendMessage(Component.text("Spieler nicht gefunden.").color(TextColor.fromHexString("#FF5555"))); return true; }
+                show(self, target);
                 return true;
             }
-
-            // Header für Zielspieler
-            printHpManaHeader(target);
-            PlayerStats stats = statsManager.getStats(target);
-            PlayerLevel level = statsManager.getLevel(target);
-            player.sendMessage("§6Stats von " + target.getName() + ":");
-            player.sendMessage(stats.toString());
-            player.sendMessage("");
-            player.sendMessage(level.toString());
-            return true;
-        }
-
-        switch (sub) {
-            case "set": {
-                if (!player.hasPermission("stats.admin")) {
-                    player.sendMessage("§cKeine Berechtigung!");
-                    return true;
-                }
-                if (args.length < 3) {
-                    player.sendMessage("§cNutzung: /stats set <stat> <wert> [spieler]");
-                    return true;
-                }
-
-                Player target = player;
-                if (args.length >= 4) {
-                    target = Bukkit.getPlayer(args[3]);
-                    if (target == null) {
-                        player.sendMessage("§cSpieler nicht gefunden!");
-                        return true;
-                    }
-                }
-
-                String stat = args[1].toLowerCase();
-                double value;
-                try {
-                    value = Double.parseDouble(args[2]);
-                } catch (NumberFormatException e) {
-                    player.sendMessage("§cUngültige Zahl!");
-                    return true;
-                }
-
-                PlayerStats s = statsManager.getStats(target);
-                switch (stat) {
-                    case "damage" -> s.setDamage(value);
-                    case "critchance", "crit" -> s.setCritChance(value);
-                    case "critdamage", "critdmg" -> s.setCritDamage(value);
-                    case "range" -> s.setRange(value);
-                    case "health", "hp" -> {
-                        s.setHealth(value);
-                        statsManager.applyHealth(target);
-                    }
-                    case "armor" -> s.setArmor(value);
-                    case "attackspeed", "aps" -> s.setAttackSpeed(value);
-                    case "mana", "ma" -> s.setAttackSpeed(value);
-                    case "manaregen", "manareg" -> s.setAttackSpeed(value);
-                    case "healthregen", "healthreg" -> s.setAttackSpeed(value);
-                    default -> {
-                        player.sendMessage("§cUnbekannter Stat! Verfügbar: damage, critchance, "
-                                + "critdamage, range, health, armor, attackspeed");
-                        return true;
-                    }
-                }
-                player.sendMessage("§a" + stat + " von " + target.getName() + " auf " + value + " gesetzt!");
+            case "set":
+            case "add":{
+                if (args.length < 4){ usage(self); return true; }
+                Player target = resolve(self, args[1]);
+                if (target == null){ self.sendMessage(Component.text("Spieler nicht gefunden.").color(TextColor.fromHexString("#FF5555"))); return true; }
+                String key = args[2].toLowerCase(Locale.ROOT);
+                double val;
+                try{ val = Double.parseDouble(args[3]); }catch(Exception e){ self.sendMessage(Component.text("Zahl ungültig.").color(TextColor.fromHexString("#FF5555"))); return true; }
+                if (sub.equals("set")) setBase(target, key, val);
+                else addBase(target, key, val);
+                statsManager.applyHealth(target);
+                self.sendMessage(Component.text((sub.equals("set")?"Gesetzt: ":"Addiert: ") + key + " = " + n(val) + " bei " + target.getName()).color(TextColor.fromHexString("#55FF55")).decoration(TextDecoration.ITALIC,false));
                 return true;
             }
-
-            case "reset": {
-                if (!player.hasPermission("stats.admin")) {
-                    player.sendMessage("§cKeine Berechtigung!");
-                    return true;
-                }
-                Player target = player;
-                if (args.length >= 2) {
-                    Player t = Bukkit.getPlayer(args[1]);
-                    if (t != null) target = t;
-                    else {
-                        player.sendMessage("§cSpieler nicht gefunden!");
-                        return true;
-                    }
-                }
+            case "reset":{
+                Player target = (args.length>=2) ? resolve(self, args[1]) : self;
+                if (target == null){ self.sendMessage(Component.text("Spieler nicht gefunden.").color(TextColor.fromHexString("#FF5555"))); return true; }
+                // <- hier: deine Signatur nutzt Player, nicht UUID
                 statsManager.resetStats(target);
-                player.sendMessage("§aStats von " + target.getName() + " zurückgesetzt!");
+                statsManager.applyHealth(target);
+                self.sendMessage(Component.text("Basestats von " + target.getName() + " zurückgesetzt.").color(TextColor.fromHexString("#55FF55")).decoration(TextDecoration.ITALIC,false));
                 return true;
             }
-
-            case "save": {
-                if (!player.hasPermission("stats.admin")) {
-                    player.sendMessage("§cKeine Berechtigung!");
-                    return true;
-                }
-                if (args.length == 1) {
-                    statsManager.saveAll();
-                    player.sendMessage("§aAlle Stats gespeichert!");
-                } else {
-                    Player target = Bukkit.getPlayer(args[1]);
-                    if (target == null) {
-                        player.sendMessage("§cSpieler nicht gefunden!");
-                        return true;
-                    }
-                    statsManager.saveStats(target.getUniqueId());
-                    player.sendMessage("§aStats von " + target.getName() + " gespeichert!");
-                }
+            case "allocate":{
+                if (args.length < 3){ usage(self); return true; }
+                String key = args[1].toLowerCase(Locale.ROOT);
+                int pts;
+                try{ pts = Integer.parseInt(args[2]); }catch(Exception e){ self.sendMessage(Component.text("Punkte müssen ganzzahlig sein.").color(TextColor.fromHexString("#FF5555"))); return true; }
+                PlayerLevel lvl = statsManager.getLevel(self);
+                int have = lvl.getSkillPoints();
+                if (pts <= 0 || have < pts){ self.sendMessage(Component.text("Nicht genug Skill Points. Verfügbar: " + have).color(TextColor.fromHexString("#FF5555"))); return true; }
+                allocate(self, key, pts);
+                lvl.setSkillPoints(have - pts);
+                statsManager.applyHealth(self);
+                show(self, self);
                 return true;
             }
-
-            case "allocate": {
-                PlayerLevel level = statsManager.getLevel(player);
-                if (level == null) {
-                    player.sendMessage("§cLevel-Daten fehlen.");
-                    return true;
-                }
-                if (args.length < 2) {
-                    player.sendMessage("§cNutzung: /stats allocate <stat> [menge]");
-                    return true;
-                }
-                String stat = args[1];
-                int amount = 1;
-                if (args.length >= 3) {
-                    try {
-                        amount = Math.max(1, Integer.parseInt(args[2]));
-                    } catch (NumberFormatException e) {
-                        player.sendMessage("§cUngültige Zahl!");
-                        return true;
-                    }
-                }
-                if (level.allocateSkillPoint(stat, amount)) {
-                    statsManager.applyHealth(player);
-                }
-                return true;
-            }
-
-            case "resetskills": {
-                PlayerLevel level = statsManager.getLevel(player);
-                if (level == null) {
-                    player.sendMessage("§cLevel-Daten fehlen.");
-                    return true;
-                }
-                level.resetSkillPoints();
-                statsManager.applyHealth(player);
-                return true;
-            }
-
             default:
-                player.sendMessage("§cNutzung: /stats [spieler] | /stats set <stat> <wert> [spieler] | "
-                        + "/stats reset [spieler] | /stats save [spieler] | "
-                        + "/stats allocate <stat> [menge] | /stats resetskills");
+                usage(self);
                 return true;
         }
     }
 
-    private void printHpManaHeader(Player p) {
-        // HP (rot)
-        int hp = (int) Math.round(p.getHealth());
-        int hpMax = (int) Math.round(p.getMaxHealth());
-        Component lineHp = Component.text()
-                .append(Component.text("HP ", NamedTextColor.RED))
-                .append(Component.text(hp + "/" + hpMax))
-                .build();
-        p.sendMessage(lineHp);
-
-        // Mana (blau), nur wenn ManaManager vorhanden
-        if (manaManager != null) {
-            int m = (int) Math.round(manaManager.get(p));
-            int mMax = (int) Math.round(manaManager.getMax(p));
-            double regen = manaManager.getRegen(p);
-            Component lineMana = Component.text()
-                    .append(Component.text("Mana ", NamedTextColor.BLUE))
-                    .append(Component.text(m + "/" + mMax + " (" + trim1(regen) + "/s)"))
-                    .build();
-            p.sendMessage(lineMana);
+    private boolean handleSub(Player self, Player explicitTarget, String[] args){
+        if (args.length == 0){ show(self, explicitTarget); return true; }
+        String sub = args[0].toLowerCase(Locale.ROOT);
+        switch (sub){
+            case "show":
+            case "get":{
+                Player t = (args.length>=2) ? resolve(self, args[1]) : explicitTarget;
+                if (t == null){ self.sendMessage(Component.text("Spieler nicht gefunden.").color(TextColor.fromHexString("#FF5555"))); return true; }
+                show(self, t);
+                return true;
+            }
+            case "set":
+            case "add":{
+                if (args.length < 3){ usage(self); return true; }
+                String key = args[1].toLowerCase(Locale.ROOT);
+                double val;
+                try{ val = Double.parseDouble(args[2]); }catch(Exception e){ self.sendMessage(Component.text("Zahl ungültig.").color(TextColor.fromHexString("#FF5555"))); return true; }
+                if (sub.equals("set")) setBase(explicitTarget, key, val);
+                else addBase(explicitTarget, key, val);
+                statsManager.applyHealth(explicitTarget);
+                self.sendMessage(Component.text((sub.equals("set")? "Gesetzt: " : "Addiert: ") + key + " = " + n(val) + " bei " + explicitTarget.getName()).color(TextColor.fromHexString("#55FF55")).decoration(TextDecoration.ITALIC,false));
+                return true;
+            }
+            case "reset":{
+                // <- hier: Player statt UUID
+                statsManager.resetStats(explicitTarget);
+                statsManager.applyHealth(explicitTarget);
+                self.sendMessage(Component.text("Basestats von " + explicitTarget.getName() + " zurückgesetzt.").color(TextColor.fromHexString("#55FF55")).decoration(TextDecoration.ITALIC,false));
+                return true;
+            }
+            default:
+                usage(self);
+                return true;
         }
     }
 
-    private String trim1(double v) {
-        boolean isInt = Math.abs(v - Math.rint(v)) < 1e-9;
-        return isInt ? String.valueOf((int) Math.rint(v))
-                : String.valueOf(((double) Math.round(v * 10)) / 10.0);
+    private Player resolve(Player self, String token){
+        if (token.equalsIgnoreCase("self") || token.equalsIgnoreCase("me")) return self;
+        return Bukkit.getPlayerExact(token);
     }
 
+    private void setBase(Player p, String key, double v){
+        PlayerStats s = statsManager.getStats(p);
+        switch (key){
+            case "damage"      -> s.setDamage(v);
+            case "critchance"  -> s.setCritChance(v);
+            case "critdamage"  -> s.setCritDamage(v);
+            case "attackspeed" -> s.setAttackSpeed(v);
+            case "range"       -> s.setRange(v);
+            case "health"      -> s.setHealth(v);
+            case "armor"       -> s.setArmor(v);
+            case "mana"        -> s.setMana(v);
+            case "manaregen"   -> s.setManaregen(v);
+            case "healthregen" -> s.setHealthregen(v);
+        }
+    }
+    private void addBase(Player p, String key, double dv){
+        PlayerStats s = statsManager.getStats(p);
+        switch (key){
+            case "damage"      -> s.setDamage(s.getDamage()+dv);
+            case "critchance"  -> s.setCritChance(s.getCritChance()+dv);
+            case "critdamage"  -> s.setCritDamage(s.getCritDamage()+dv);
+            case "attackspeed" -> s.setAttackSpeed(s.getAttackSpeed()+dv);
+            case "range"       -> s.setRange(s.getRange()+dv);
+            case "health"      -> s.setHealth(s.getHealth()+dv);
+            case "armor"       -> s.setArmor(s.getArmor()+dv);
+            case "mana"        -> s.setMana(s.getMana()+dv);
+            case "manaregen"   -> s.setManaregen(s.getManaregen()+dv);
+            case "healthregen" -> s.setHealthregen(s.getHealthregen()+dv);
+        }
+    }
+    private void allocate(Player self, String key, int pts){
+        PlayerStats s = statsManager.getStats(self);
+        switch (key){
+            case "damage"      -> s.setDamage(s.getDamage()+pts);
+            case "health"      -> s.setHealth(s.getHealth()+pts);
+            case "armor"       -> s.setArmor(s.getArmor()+pts);
+            case "range"       -> s.setRange(s.getRange()+pts);
+            case "attackspeed" -> s.setAttackSpeed(s.getAttackSpeed()+pts);
+            case "critchance"  -> s.setCritChance(s.getCritChance()+pts);
+            case "critdamage"  -> s.setCritDamage(s.getCritDamage()+pts);
+            case "mana"        -> s.setMana(s.getMana()+pts);
+            case "manaregen"   -> s.setManaregen(s.getManaregen()+pts);
+            case "healthregen" -> s.setHealthregen(s.getHealthregen()+pts);
+        }
+    }
+
+    private void show(Player viewer, Player target){
+        Map<String,String> lbl = labels();
+        Map<String,TextColor> col = colors();
+        List<String> ord = order();
+
+        PlayerStats ps = statsManager.getStats(target);
+        double dmg = ps.getDamage();
+        double cc  = ps.getCritChance();
+        double cd  = ps.getCritDamage();
+        double as_ = ps.getAttackSpeed();
+        double rg  = ps.getRange();
+        double hp  = ps.getHealth();
+        double ar  = ps.getArmor();
+
+        double mMax = manaManager.getMax(target);
+        double mReg = manaManager.getRegen(target);
+        double hpr  = statsManager.getTotalHealthRegen(target);
+
+
+        PlayerLevel lvl = statsManager.getLevel(target);
+
+        viewer.sendMessage(header(lbl.getOrDefault("header_stats","=== Stats ===")));
+        for (String k : ord){
+            switch (k){
+                case "damage"      -> viewer.sendMessage(line(lbl.get("damage"),      n(dmg), col.get("damage")));
+                case "critchance"  -> viewer.sendMessage(line(lbl.get("critchance"),  n(cc)  + "%",  col.get("critchance")));
+                case "critdamage"  -> viewer.sendMessage(line(lbl.get("critdamage"),  n(cd)  + "%",  col.get("critdamage")));
+                case "attackspeed" -> viewer.sendMessage(line(lbl.get("attackspeed"), n(as_),        col.get("attackspeed")));
+                case "range"       -> viewer.sendMessage(line(lbl.get("range"),       n(rg),         col.get("range")));
+                case "health"      -> viewer.sendMessage(line(lbl.get("health"),      n(hp),         col.get("health")));
+                case "armor"       -> viewer.sendMessage(line(lbl.get("armor"),       n(ar),         col.get("armor")));
+                case "mana"        -> viewer.sendMessage(line(lbl.get("mana"),        n(mMax),       col.get("mana")));
+                case "manaregen"   -> viewer.sendMessage(line(lbl.get("manaregen"),   n(mReg)+"/s",  col.get("manaregen")));
+                case "healthregen" -> viewer.sendMessage(line(lbl.get("healthregen"), n(hpr)+"/s",   col.get("healthregen")));
+            }
+        }
+
+        viewer.sendMessage(header(lbl.getOrDefault("header_level","=== Level & XP ===")));
+        viewer.sendMessage(line(lbl.getOrDefault("level","Level"), String.valueOf(lvl.getLevel()), TextColor.fromHexString("#FFD166")));
+        viewer.sendMessage(line(lbl.getOrDefault("xp","XP"), (int)lvl.getXP() + " / " + (int)lvl.getRequiredXP(), TextColor.fromHexString("#E0E0E0")));
+        viewer.sendMessage(line(lbl.getOrDefault("skillpoints","Skill Points"), String.valueOf(lvl.getSkillPoints()), TextColor.fromHexString("#F7A8B8")));
+    }
+
+    // ---------- TabComplete ----------
     @Override
-    public List<String> onTabComplete(CommandSender sender, Command command, String label, String[] args) {
-        List<String> completions = new ArrayList<>();
-
-        if (args.length == 1) {
-            completions.addAll(Arrays.asList("set", "reset", "save", "allocate", "resetskills"));
-            Bukkit.getOnlinePlayers().forEach(p -> completions.add(p.getName()));
-        } else if (args.length == 2 && args[0].equalsIgnoreCase("set")) {
-            completions.addAll(Arrays.asList("damage", "critchance", "critdamage", "range", "health", "armor", "attackspeed","mana","manaregen","healthregen"));
-        } else if (args.length == 3 && args[0].equalsIgnoreCase("set")) {
-            completions.add("<wert>");
-        } else if (args.length == 2 && args[0].equalsIgnoreCase("reset")) {
-            Bukkit.getOnlinePlayers().forEach(p -> completions.add(p.getName()));
-        } else if (args.length == 2 && args[0].equalsIgnoreCase("save")) {
-            Bukkit.getOnlinePlayers().forEach(p -> completions.add(p.getName()));
-        } else if (args.length == 2 && args[0].equalsIgnoreCase("allocate")) {
-            completions.addAll(Arrays.asList("health","damage","armor","critchance","critdamage","range","attackspeed","mana","manaregen","healthregen"));
-        } else if (args.length == 3 && args[0].equalsIgnoreCase("allocate")) {
-            completions.add("<menge>");
+    public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
+        if (!(sender instanceof Player)) return Collections.emptyList();
+        if (args.length == 1){
+            List<String> base = new ArrayList<>();
+            base.add("show"); base.add("get"); base.add("set"); base.add("add"); base.add("reset"); base.add("allocate");
+            String pref = args[0].toLowerCase(Locale.ROOT);
+            for (Player p : Bukkit.getOnlinePlayers()){
+                if (p.getName().toLowerCase(Locale.ROOT).startsWith(pref)) base.add(p.getName());
+            }
+            return base;
         }
-        return completions;
+        if (args.length == 2 && (args[0].equalsIgnoreCase("set") || args[0].equalsIgnoreCase("add") || args[0].equalsIgnoreCase("reset"))){
+            List<String> out = new ArrayList<>();
+            out.add("self");
+            for (Player p : Bukkit.getOnlinePlayers()) out.add(p.getName());
+            return out;
+        }
+        if (args.length == 3 && (args[0].equalsIgnoreCase("set") || args[0].equalsIgnoreCase("add"))){
+            return Arrays.asList("damage","critchance","critdamage","attackspeed","range","health","armor","mana","manaregen","healthregen");
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("allocate")){
+            return Arrays.asList("damage","health","armor","range","attackspeed","critchance","critdamage","mana","manaregen","healthregen");
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("allocate")){
+            return Collections.singletonList("<punkte>");
+        }
+        return Collections.emptyList();
+    }
+
+    // ---------- usage (jetzt vorhanden) ----------
+    private void usage(Player p){
+        p.sendMessage(Component.text("/stats [player]").color(TextColor.fromHexString("#AAAAAA")).decoration(TextDecoration.ITALIC,false));
+        p.sendMessage(Component.text("/stats get [self|player]").color(TextColor.fromHexString("#AAAAAA")).decoration(TextDecoration.ITALIC,false));
+        p.sendMessage(Component.text("/stats set <self|player> <key> <value>").color(TextColor.fromHexString("#AAAAAA")).decoration(TextDecoration.ITALIC,false));
+        p.sendMessage(Component.text("/stats add <self|player> <key> <delta>").color(TextColor.fromHexString("#AAAAAA")).decoration(TextDecoration.ITALIC,false));
+        p.sendMessage(Component.text("/stats reset [self|player]").color(TextColor.fromHexString("#AAAAAA")).decoration(TextDecoration.ITALIC,false));
+        p.sendMessage(Component.text("/stats allocate <key> <points>").color(TextColor.fromHexString("#AAAAAA")).decoration(TextDecoration.ITALIC,false));
     }
 }

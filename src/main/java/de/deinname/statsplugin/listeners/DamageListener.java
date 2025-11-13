@@ -6,14 +6,19 @@ import de.deinname.statsplugin.abilities.DamageBoostState;
 import de.deinname.statsplugin.combat.CustomReach;
 import de.deinname.statsplugin.util.DamageNumbers;
 import org.bukkit.Particle;
+import org.bukkit.enchantments.Enchantment;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Projectile;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import de.deinname.statsplugin.listeners.AttackListener;
 
 import java.util.UUID;
+import java.util.Vector;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -62,7 +67,7 @@ public class DamageListener implements Listener {
         // --- 3) Eigene Schadensberechnung ---
         boolean crit = rollCrit(atk.getCritChance());
         double damage = atk.getDamage();
-        if (crit) damage *= (1.0 + atk.getCritDamage() / 100.0);
+        if (crit) damage *= (atk.getCritDamage() / 100.0);
 
         if (victim instanceof Player def) {
             PlayerStats defStats = statsManager.getStats(def);
@@ -75,14 +80,23 @@ public class DamageListener implements Listener {
             damage *= DamageBoostState.getMultiplier(aid);
         }
 
-        // --- 4) Final setzen ---
-        e.setDamage(Math.max(0.0, damage));
+// 4) Vanilla-Schaden ausschalten
+// (wir setzen ihn auf 0, lassen das Event aber NICHT cancelled -> Killer bleibt für XP)
+        e.setDamage(0.0);
 
-        // --- 5) Feedback ---
+// 5) Eigenen Schaden auf die HP anwenden
+        double before = victim.getHealth();
+        double after = Math.max(0.0, before - damage);
+        victim.setHealth(after);
+
+// 6) Feedback: Damage-Number & Crit-Partikel
         numbers.show(victim.getWorld(), victim.getLocation(), damage, crit);
         if (crit) {
-            victim.getWorld().spawnParticle(Particle.CRIT, victim.getLocation().add(0, 1, 0),
-                    25, 0.4, 0.4, 0.4, 0.05);
+            victim.getWorld().spawnParticle(
+                    Particle.CRIT,
+                    victim.getLocation().add(0, 1, 0),
+                    25, 0.4, 0.4, 0.4, 0.05
+            );
         }
     }
 

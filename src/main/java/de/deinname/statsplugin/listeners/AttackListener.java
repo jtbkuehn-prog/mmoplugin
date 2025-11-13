@@ -89,6 +89,7 @@ public class AttackListener implements Listener {
         //  aber bei Extended trifft Vanilla nicht automatisch; deswegen:
         //  Wir "simulieren" einen Hit, indem wir target.damage(0, p) triggern,
         //  so dass das Event läuft und unser DamageListener drankommt.)
-        target.damage(0.0, p); // feuert EntityDamageByEntityEvent mit Angreifer p
+        target.damage(0.0, p);// feuert EntityDamageByEntityEvent mit Angreifer p
+
     }
 }

@@ -82,6 +82,22 @@ public class StatsManager {
     public double getHealthRegen(UUID id) { return healthRegen.getOrDefault(id, 0.0); }
     public void setHealthRegen(UUID id, double v) { healthRegen.put(id, Math.max(0.0, v)); }
 
+    private final Map<UUID, Double> itemHealthRegen = new ConcurrentHashMap<>();
+
+    public void setItemHealthRegen(UUID id, double v) {
+        itemHealthRegen.put(id, Math.max(0.0, v));
+    }
+
+    public double getItemHealthRegen(UUID id) {
+        return itemHealthRegen.getOrDefault(id, 0.0);
+    }
+
+    // Gesamt-HealthRegen = Base (in PlayerStats) + Item
+    public double getTotalHealthRegen(Player p) {
+        double base = getStats(p).getHealthregen();        // aus PlayerStats (via /stats set)
+        double item = getItemHealthRegen(p.getUniqueId()); // aus Items
+        return Math.max(0.0, base) + Math.max(0.0, item);
+    }
 
     // Setzt Health des Spielers basierend auf Stats
     public void applyHealth(Player player) {

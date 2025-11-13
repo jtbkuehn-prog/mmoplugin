@@ -15,16 +15,16 @@ import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.plugin.Plugin;
+import org.bukkit.plugin.java.JavaPlugin;
 
 public class ItemRecalcListener implements Listener {
 
+    private final JavaPlugin plugin;
     private final StatsManager stats;
     private final ManaManager mana;
     private final ItemStatKeys keys;
-    private final Plugin plugin;
 
-    public ItemRecalcListener(Plugin plugin, StatsManager stats, ManaManager mana, ItemStatKeys keys) {
+    public ItemRecalcListener(JavaPlugin plugin, StatsManager stats, ManaManager mana, ItemStatKeys keys) {
         this.plugin = plugin;
         this.stats = stats;
         this.mana = mana;
@@ -32,81 +32,60 @@ public class ItemRecalcListener implements Listener {
     }
 
     @EventHandler
-    public void onJoin(PlayerJoinEvent e) {
-        Player p = e.getPlayer();
-        int lvl = stats.getLevel(p.getUniqueId()).getLevel();
-
-        double baseMax   = plugin.getConfig().getDouble("mana.base-max", 50.0)
-                + lvl * plugin.getConfig().getDouble("mana.per-level", 5.0);
-        double baseRegen = plugin.getConfig().getDouble("mana.base-regen", 1.0)
-                + lvl * plugin.getConfig().getDouble("mana.regen-per-level", 0.1);
-
-        mana.init(p, baseMax, baseRegen); // setzt current = base
-        // 1 Tick später recalc (Inventar ist dann konsistent)
-        plugin.getServer().getScheduler().runTask(plugin, () -> recalc(p, baseMax, baseRegen));
+    public void onJoin(PlayerJoinEvent e){
+        // nach Join einmal sauber rechnen (kein Delay nötig, aber schadet nicht)
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> recalc(e.getPlayer()), 1L);
     }
 
     @EventHandler
-    public void onHeld(PlayerItemHeldEvent e) {
-        // HeldEvent kommt VOR dem echten Slotwechsel -> 1 Tick später recalc
+    public void onHeld(PlayerItemHeldEvent e){
+        // WICHTIG: erst einen Tick später ist der Mainhand-Slot wirklich umgeschaltet
         Player p = e.getPlayer();
-        int lvl = stats.getLevel(p.getUniqueId()).getLevel();
-        double baseMax   = plugin.getConfig().getDouble("mana.base-max", 50.0)
-                + lvl * plugin.getConfig().getDouble("mana.per-level", 5.0);
-        double baseRegen = plugin.getConfig().getDouble("mana.base-regen", 1.0)
-                + lvl * plugin.getConfig().getDouble("mana.regen-per-level", 0.1);
-
-        plugin.getServer().getScheduler().runTask(plugin, () -> recalc(p, baseMax, baseRegen));
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> recalc(p), 1L);
     }
 
     @EventHandler
-    public void onInv(InventoryClickEvent e) {
-        if (!(e.getWhoClicked() instanceof Player p)) return;
-        int lvl = stats.getLevel(p.getUniqueId()).getLevel();
-        double baseMax   = plugin.getConfig().getDouble("mana.base-max", 50.0)
-                + lvl * plugin.getConfig().getDouble("mana.per-level", 5.0);
-        double baseRegen = plugin.getConfig().getDouble("mana.base-regen", 1.0)
-                + lvl * plugin.getConfig().getDouble("mana.regen-per-level", 0.1);
-        // Nach dem Click ist das Item erst NACH dem Tick korrekt -> verzögern
-        plugin.getServer().getScheduler().runTask(plugin, () -> recalc(p, baseMax, baseRegen));
+    public void onSwap(PlayerSwapHandItemsEvent e){
+        // Offhand/Mainhand-Tausch -> auch verzögert neu rechnen
+        Player p = e.getPlayer();
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> recalc(p), 1L);
     }
 
     @EventHandler
-    public void onSwap(PlayerSwapHandItemsEvent e) {
-        Player p = e.getPlayer();
-        int lvl = stats.getLevel(p.getUniqueId()).getLevel();
-        double baseMax   = plugin.getConfig().getDouble("mana.base-max", 50.0)
-                + lvl * plugin.getConfig().getDouble("mana.per-level", 5.0);
-        double baseRegen = plugin.getConfig().getDouble("mana.base-regen", 1.0)
-                + lvl * plugin.getConfig().getDouble("mana.regen-per-level", 0.1);
-        plugin.getServer().getScheduler().runTask(plugin, () -> recalc(p, baseMax, baseRegen));
-    }
-
-    private void recalc(Player p, double baseMax, double baseRegen) {
-        ItemStats total = ItemStats.zero();
-
-        // Armor
-        for (ItemStack is : p.getInventory().getArmorContents()) {
-            total = total.add(ItemStatUtils.read(is, keys));
+    public void onInv(InventoryClickEvent e){
+        if (e.getWhoClicked() instanceof Player p){
+            // Nach Inventar-Änderungen einen Tick später neu berechnen
+            plugin.getServer().getScheduler().runTaskLater(plugin, () -> recalc(p), 1L);
         }
-        // Mainhand (jetzt korrekt, weil 1 Tick später)
+    }
+
+    private void recalc(Player p){
+        // Items summieren (Rüstung + Mainhand + Offhand, falls du Offhand-Stats willst)
+        ItemStats total = ItemStats.zero();
+        for (ItemStack armor : p.getInventory().getArmorContents()) {
+            total = total.add(ItemStatUtils.read(armor, keys));
+        }
         total = total.add(ItemStatUtils.read(p.getInventory().getItemInMainHand(), keys));
+        total = total.add(ItemStatUtils.read(p.getInventory().getItemInOffHand(), keys)); // optional — rausnehmen, wenn Offhand nichts geben soll
 
-        // Item-Boni in Stats einspeisen (Delta-Logik im StatsManager)
-        stats.applyItemBonuses(p.getUniqueId(),
+        // Item-Werte in Manager übernehmen
+        stats.applyItemBonuses(
+                p.getUniqueId(),
                 total.damage(), total.critChance(), total.critDamage(),
-                total.health(), total.armor(), total.range(), total.attackspeed());
+                total.health(), total.armor(), total.range(), total.attackspeed()
+        );
+        stats.applyHealth(p);
 
-        // >>> NEU/WICHTIG: Spieler-MaxHealth sofort aktualisieren
-        stats.applyHealth(p);  // <— diese Zeile sorgt dafür, dass Health sofort wirkt
+        // Item-HealthRegen in die Item-Map (du hattest 1–4 schon umgesetzt)
+        stats.setItemHealthRegen(p.getUniqueId(), total.healthRegen());
 
-        // Mana: niemals stapeln – immer base + items
+        // Mana (base aus Level + items)
+        int lvl = stats.getLevel(p).getLevel();
+        double baseMax   = plugin.getConfig().getDouble("mana.base-max", 50.0) + lvl * plugin.getConfig().getDouble("mana.per-level", 5.0);
+        double baseRegen = plugin.getConfig().getDouble("mana.base-regen", 1.0) + lvl * plugin.getConfig().getDouble("mana.regen-per-level", 0.1);
         mana.setMax(p,   baseMax   + total.manaMax());
         mana.setRegen(p, baseRegen + total.manaRegen());
 
-        stats.setHealthRegen(p.getUniqueId(), total.healthRegen());
-
-        // optionales Feedback
         p.sendActionBar(Component.text("Stats aktualisiert", NamedTextColor.GREEN));
     }
 }

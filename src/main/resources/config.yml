@@ -1,7 +1,38 @@
 xp:
-  max-level: 100
-  base: 100.0
+  base: 100.0       # (für PlayerLevel.configure)
   multiplier: 1.15
+  max-level: 100
+
+  # Anzeige-Optionen für "+XP"
+  announce:
+    chat: false           # false setzen, wenn du die Chat-Meldung ausschalten willst (z. B. wenn PlayerLevel selbst meldet)
+    color: "#FFD166"      # Farbe der Chat-Meldung
+
+  mobs:
+    default: 0
+
+    # Gruppen (werden nur genutzt, wenn der exakte Mob nicht definiert ist)
+    HOSTILE: 4
+    PASSIVE: 1
+    NEUTRAL: 2
+
+    # Exakte Mobs (haben Vorrang vor Gruppen)
+    WITCH: 20
+    ZOMBIE: 6
+    SKELETON: 6
+    SPIDER: 6
+    CREEPER: 8
+    ENDERMAN: 12
+
+    IRON_GOLEM: 10   # <-- jetzt explizit drin
+    SNOW_GOLEM: 3
+    WOLF: 2
+
+    COW: 5
+    SHEEP: 5
+    PIG: 5
+    CHICKEN: 5
+
 
 mana:
   base-max: 50.0
@@ -38,3 +69,50 @@ lore_colors:
   custom:      "#BFBFBF"
   healthregen: "#FF7777"
   attackspeed: "#FF7777"
+
+stats_display:
+  order:
+    - damage
+    - critchance
+    - critdamage
+    - attackspeed
+    - range
+    - health
+    - armor
+    - mana
+    - manaregen
+    - healthregen
+
+  colors:
+    damage:      "#FF5555"
+    critchance:  "#55FFFF"
+    critdamage:  "#FFD166"
+    attackspeed: "#FFD166"
+    range:       "#55FF55"
+    health:      "#FF4444"
+    armor:       "#AAAAAA"
+    mana:        "#55AAFF"
+    manaregen:   "#55AAFF"
+    healthregen: "#FF77AA"
+
+  labels:
+    header_stats: "=== Stats ==="
+    damage: "Damage"
+    critchance: "Crit Chance"
+    critdamage: "Crit Damage"
+    attackspeed: "Attack Speed"
+    range: "Range"
+    health: "Health"
+    armor: "Armor"
+    mana: "Mana"
+    manaregen: "Mana Regen"
+    healthregen: "Health Regen"
+    header_level: "=== Level & XP ==="
+    level: "Level"
+    xp: "XP"
+    skillpoints: "Skill Points"
+
+combat:
+  knockback:
+    base: 0.40
+    y: 0.35

@@ -2,77 +2,121 @@ package de.deinname.statsplugin.listeners;
 
 import de.deinname.statsplugin.PlayerLevel;
 import de.deinname.statsplugin.StatsManager;
-import org.bukkit.entity.*;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.TextColor;
+import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.entity.EntityType;
+import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.player.PlayerExpChangeEvent;
+import org.bukkit.plugin.java.JavaPlugin;
 
+/**
+ * Vergibt konfigurierbare XP beim Kill und deaktiviert Vanilla-EXP komplett.
+ * Priorität:
+ *  1) exakter Eintrag in xp.mobs (z.B. WITCH)
+ *  2) Gruppen-Fallback (HOSTILE / PASSIVE / NEUTRAL), wenn vorhanden
+ *  3) xp.mobs.default
+ *
+ * Anzeige im Chat ist konfigurierbar (xp.announce.chat).
+ */
 public class XPListener implements Listener {
-    private final StatsManager statsManager;
 
-    public XPListener(StatsManager statsManager) {
-        this.statsManager = statsManager;
+    private final JavaPlugin plugin;
+    private final StatsManager stats;
+
+    public XPListener(JavaPlugin plugin, StatsManager stats) {
+        this.plugin = plugin;
+        this.stats = stats;
     }
 
-    @EventHandler
-    public void onMobKill(EntityDeathEvent event) {
-        // Nur wenn ein Spieler getötet hat
-        Player killer = event.getEntity().getKiller();
+    // 1) Vanilla-EXP (grüne Orbs / Player-Level) komplett ausschalten
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onPlayerExp(PlayerExpChangeEvent e) {
+        // verhindert, dass der Spieler Vanilla-EXP gutgeschrieben bekommt
+        e.setAmount(0);
+    }
 
-        if (killer == null) {
-            return;
+    // 2) Eigene XP-Vergabe
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onDeath(EntityDeathEvent e) {
+        LivingEntity dead = e.getEntity();
+
+        // Keine Vanilla-Orbs droppen lassen
+        e.setDroppedExp(0);
+
+        Player killer = dead.getKiller();
+        if (killer == null) return; // wir vergeben hier nur bei "echtem" Killer
+
+        int xp = resolveXp(dead.getType());
+        if (xp <= 0) return;
+
+        // Deine Level-Logik
+        PlayerLevel lvl = stats.getLevel(killer); // getLevel(Player)
+        // NOTE: falls deine Methode anders heißt, hier anpassen (z.B. addXp(double))
+        lvl.addXP(xp);
+
+        // Chat-Toast optional
+        if (plugin.getConfig().getBoolean("xp.announce.chat", true)) {
+            killer.sendMessage(Component.text("+" + xp + " XP")
+                    .color(TextColor.fromHexString(plugin.getConfig().getString("xp.announce.color", "#FFD166"))));
         }
-
-
-        // Vanilla XP deaktivieren (wir haben unser eigenes System)
-        event.setDroppedExp(0);
-
-        // XP basierend auf Mob-Typ
-        double xp = getXPForEntity(event.getEntity());
-
-
     }
 
-    // Berechnet XP-Wert für verschiedene Mobs
-    private double getXPForEntity(LivingEntity entity) {
-        // Basis-XP nach Mob-Typ
-        return switch (entity.getType()) {
-            // Schwache Mobs
-            case CHICKEN, COW, PIG, SHEEP, RABBIT -> 5.0;
+    // ---- Helper: exakter Wert > Gruppe > default ----
+    private int resolveXp(EntityType type) {
+        ConfigurationSection sec = plugin.getConfig().getConfigurationSection("xp.mobs");
+        if (sec == null) return plugin.getConfig().getInt("xp.mobs.default", 0);
 
-            // Normale Mobs
-            case ZOMBIE, SKELETON, SPIDER, CAVE_SPIDER -> 10.0;
-            case CREEPER -> 15.0;
+        String name = type.name(); // z.B. WITCH, ZOMBIE, SHEEP, IRON_GOLEM
 
-            // Stärkere Mobs
-            case ENDERMAN, WITCH -> 20.0;
-            case BLAZE, GHAST -> 25.0;
+        // 1) Exakter Eintrag hat Vorrang
+        if (sec.isInt(name)) return sec.getInt(name);
 
-            // Elite Mobs
-            case WITHER_SKELETON -> 30.0;
-            case PIGLIN_BRUTE -> 35.0;
+        // 2) Gruppen-Fallback
+        String group = groupOf(type);
+        if (group != null && sec.isInt(group)) return sec.getInt(group);
 
-            // Mini-Bosses
-            case RAVAGER -> 50.0;
-            case ELDER_GUARDIAN -> 75.0;
+        // 3) Default
+        return plugin.getConfig().getInt("xp.mobs.default", 0);
+    }
 
-            // Bosses
-            case WARDEN -> 150.0;
-            case ENDER_DRAGON -> 500.0;
-            case WITHER -> 400.0;
-
-            // Spieler (PvP)
-            case PLAYER -> {
-                Player victim = (Player) entity;
-                PlayerLevel victimLevel = statsManager.getLevel(victim);
-                if (victimLevel != null) {
-                    yield victimLevel.getLevel() * 10.0;
-                }
-                yield 50.0; // Fallback wenn Level null ist
-            }
-
-            // Alle anderen
-            default -> 5.0;
-        };
+    private String groupOf(EntityType type) {
+        // Hostiles
+        switch (type) {
+            case ZOMBIE: case HUSK: case DROWNED:
+            case SKELETON: case STRAY:
+            case SPIDER: case CAVE_SPIDER:
+            case CREEPER:
+            case ENDERMAN:
+            case WITCH:
+            case SLIME: case MAGMA_CUBE:
+            case PHANTOM:
+            case SILVERFISH:
+            case ZOMBIFIED_PIGLIN:
+                return "HOSTILE";
+        }
+        // Passive
+        switch (type) {
+            case COW: case SHEEP: case PIG:
+            case CHICKEN: case RABBIT: case GOAT:
+            case HORSE:
+            case SQUID: case GLOW_SQUID:
+            case TURTLE: case BEE:
+                return "PASSIVE";
+        }
+        // Neutral / Utility (z. B. Golems, Wölfe …)
+        switch (type) {
+            case IRON_GOLEM:
+            case SNOW_GOLEM:
+            case WOLF:
+            case DOLPHIN:
+                return "NEUTRAL";
+        }
+        return null;
     }
 }
