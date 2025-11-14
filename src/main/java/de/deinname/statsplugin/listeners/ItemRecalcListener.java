@@ -86,6 +86,5 @@ public class ItemRecalcListener implements Listener {
         mana.setMax(p,   baseMax   + total.manaMax());
         mana.setRegen(p, baseRegen + total.manaRegen());
 
-        p.sendActionBar(Component.text("Stats aktualisiert", NamedTextColor.GREEN));
     }
 }
