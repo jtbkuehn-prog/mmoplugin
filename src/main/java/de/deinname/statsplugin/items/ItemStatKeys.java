@@ -17,6 +17,7 @@ public final class ItemStatKeys {
     public final NamespacedKey ABILITY; // z.B. "damage_boost"
     public final NamespacedKey HEALTH_REGEN;
     public final NamespacedKey ATTACKSPEED;
+    public final NamespacedKey SPEED;
 
     public ItemStatKeys(org.bukkit.plugin.java.JavaPlugin plugin) {
         DAMAGE = new NamespacedKey(plugin, "damage");
@@ -30,5 +31,6 @@ public final class ItemStatKeys {
         ABILITY = new NamespacedKey(plugin, "ability");
         HEALTH_REGEN = new NamespacedKey(plugin, "health_regen");
         ATTACKSPEED = new NamespacedKey(plugin, "attackspeed");
+        SPEED = new NamespacedKey(plugin, "speed");
     }
 }

@@ -114,6 +114,7 @@ public class StatsPlugin extends JavaPlugin {
         getServer().getOnlinePlayers().forEach(p -> {
             statsManager.getStats(p);
             statsManager.applyHealth(p);
+            statsManager.applySpeed(p);
             p.setFoodLevel(20);
             p.setSaturation(20f);
             p.setExhaustion(0f);

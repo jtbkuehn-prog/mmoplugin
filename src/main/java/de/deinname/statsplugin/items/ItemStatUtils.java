@@ -24,8 +24,9 @@ public final class ItemStatUtils {
         double manaReg = get(pdc, keys.MANA_REGEN);
         double hpr     = get(pdc, keys.HEALTH_REGEN);
         double as_     = get(pdc, keys.ATTACKSPEED);
+        double sp     = get(pdc, keys.SPEED);
 
-        return new ItemStats(dmg, cc, cd, hp, armor, range, manaMax, manaReg, hpr, as_);
+        return new ItemStats(dmg, cc, cd, hp, armor, range, manaMax, manaReg, hpr, as_, sp);
     }
 
     public static void writeStat(ItemStack is, NamespacedKey key, double value){

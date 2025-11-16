@@ -46,6 +46,7 @@ public class StatsCommand implements CommandExecutor, TabCompleter {
         out.put("mana","Mana");
         out.put("manaregen","Mana Regen");
         out.put("healthregen","Health Regen");
+        out.put("speed","Speed");
         out.put("header_level","=== Level & XP ===");
         out.put("level","Level");
         out.put("xp","XP");
@@ -75,6 +76,7 @@ public class StatsCommand implements CommandExecutor, TabCompleter {
         out.put("mana",        TextColor.fromHexString("#55AAFF"));
         out.put("manaregen",   TextColor.fromHexString("#55AAFF"));
         out.put("healthregen", TextColor.fromHexString("#FF77AA"));
+        out.put("speed", TextColor.fromHexString("#FFFFFF"));
 
         JavaPlugin pl = getPlugin();
         if (pl != null){
@@ -90,7 +92,7 @@ public class StatsCommand implements CommandExecutor, TabCompleter {
     }
 
     private List<String> order(){
-        List<String> def = Arrays.asList("damage","critchance","critdamage","attackspeed","range","health","armor","mana","manaregen","healthregen");
+        List<String> def = Arrays.asList("damage","critchance","critdamage","attackspeed","range","health","armor","mana","manaregen","healthregen","speed");
         JavaPlugin pl = getPlugin();
         if (pl != null){
             List<String> conf = pl.getConfig().getStringList("stats_display.order");
@@ -163,6 +165,7 @@ public class StatsCommand implements CommandExecutor, TabCompleter {
                 if (sub.equals("set")) setBase(target, key, val);
                 else addBase(target, key, val);
                 statsManager.applyHealth(target);
+                statsManager.applySpeed(target);
                 self.sendMessage(Component.text((sub.equals("set")?"Gesetzt: ":"Addiert: ") + key + " = " + n(val) + " bei " + target.getName()).color(TextColor.fromHexString("#55FF55")).decoration(TextDecoration.ITALIC,false));
                 return true;
             }
@@ -172,6 +175,7 @@ public class StatsCommand implements CommandExecutor, TabCompleter {
                 // <- hier: deine Signatur nutzt Player, nicht UUID
                 statsManager.resetStats(target);
                 statsManager.applyHealth(target);
+                statsManager.applySpeed(target);
                 self.sendMessage(Component.text("Basestats von " + target.getName() + " zurückgesetzt.").color(TextColor.fromHexString("#55FF55")).decoration(TextDecoration.ITALIC,false));
                 return true;
             }
@@ -186,6 +190,7 @@ public class StatsCommand implements CommandExecutor, TabCompleter {
                 allocate(self, key, pts);
                 lvl.setSkillPoints(have - pts);
                 statsManager.applyHealth(self);
+                statsManager.applySpeed(self);
                 show(self, self);
                 return true;
             }
@@ -215,6 +220,7 @@ public class StatsCommand implements CommandExecutor, TabCompleter {
                 if (sub.equals("set")) setBase(explicitTarget, key, val);
                 else addBase(explicitTarget, key, val);
                 statsManager.applyHealth(explicitTarget);
+                statsManager.applySpeed(explicitTarget);
                 self.sendMessage(Component.text((sub.equals("set")? "Gesetzt: " : "Addiert: ") + key + " = " + n(val) + " bei " + explicitTarget.getName()).color(TextColor.fromHexString("#55FF55")).decoration(TextDecoration.ITALIC,false));
                 return true;
             }
@@ -222,6 +228,7 @@ public class StatsCommand implements CommandExecutor, TabCompleter {
                 // <- hier: Player statt UUID
                 statsManager.resetStats(explicitTarget);
                 statsManager.applyHealth(explicitTarget);
+                statsManager.applySpeed(explicitTarget);
                 self.sendMessage(Component.text("Basestats von " + explicitTarget.getName() + " zurückgesetzt.").color(TextColor.fromHexString("#55FF55")).decoration(TextDecoration.ITALIC,false));
                 return true;
             }
@@ -239,46 +246,50 @@ public class StatsCommand implements CommandExecutor, TabCompleter {
     private void setBase(Player p, String key, double v){
         PlayerStats s = statsManager.getStats(p);
         switch (key){
-            case "damage"      -> s.setDamage(v);
-            case "critchance"  -> s.setCritChance(v);
-            case "critdamage"  -> s.setCritDamage(v);
-            case "attackspeed" -> s.setAttackSpeed(v);
-            case "range"       -> s.setRange(v);
-            case "health"      -> s.setHealth(v);
-            case "armor"       -> s.setArmor(v);
-            case "mana"        -> s.setMana(v);
-            case "manaregen"   -> s.setManaregen(v);
-            case "healthregen" -> s.setHealthregen(v);
+            case "damage"      -> s.setBaseDamage(v);
+            case "critchance"  -> s.setBaseCritChance(v);
+            case "critdamage"  -> s.setBaseCritDamage(v);
+            case "attackspeed" -> s.setBaseAttackSpeed(v);
+            case "range"       -> s.setBaseRange(v);
+            case "health"      -> s.setBaseHealth(v);
+            case "armor"       -> s.setBaseArmor(v);
+            case "mana"        -> s.setBaseMana(v);
+            case "manaregen"   -> s.setBaseManaRegen(v);
+            case "healthregen" -> s.setBaseHealthRegen(v);
+            case "speed"       -> s.setBaseSpeed(v);
         }
     }
+
     private void addBase(Player p, String key, double dv){
         PlayerStats s = statsManager.getStats(p);
         switch (key){
-            case "damage"      -> s.setDamage(s.getDamage()+dv);
-            case "critchance"  -> s.setCritChance(s.getCritChance()+dv);
-            case "critdamage"  -> s.setCritDamage(s.getCritDamage()+dv);
-            case "attackspeed" -> s.setAttackSpeed(s.getAttackSpeed()+dv);
-            case "range"       -> s.setRange(s.getRange()+dv);
-            case "health"      -> s.setHealth(s.getHealth()+dv);
-            case "armor"       -> s.setArmor(s.getArmor()+dv);
-            case "mana"        -> s.setMana(s.getMana()+dv);
-            case "manaregen"   -> s.setManaregen(s.getManaregen()+dv);
-            case "healthregen" -> s.setHealthregen(s.getHealthregen()+dv);
+            case "damage"      -> s.setBaseDamage(s.getDamage()+dv);
+            case "critchance"  -> s.setBaseCritChance(s.getCritChance()+dv);
+            case "critdamage"  -> s.setBaseCritDamage(s.getCritDamage()+dv);
+            case "attackspeed" -> s.setBaseAttackSpeed(s.getAttackSpeed()+dv);
+            case "range"       -> s.setBaseRange(s.getRange()+dv);
+            case "health"      -> s.setBaseHealth(s.getHealth()+dv);
+            case "armor"       -> s.setBaseArmor(s.getArmor()+dv);
+            case "mana"        -> s.setBaseMana(s.getMana()+dv);
+            case "manaregen"   -> s.setBaseManaRegen(s.getManaRegen()+dv);
+            case "healthregen" -> s.setBaseHealthRegen(s.getHealthRegen()+dv);
+            case "speed" -> s.setBaseSpeed(s.getSpeed()+dv);
         }
     }
     private void allocate(Player self, String key, int pts){
         PlayerStats s = statsManager.getStats(self);
         switch (key){
-            case "damage"      -> s.setDamage(s.getDamage()+pts);
-            case "health"      -> s.setHealth(s.getHealth()+pts);
-            case "armor"       -> s.setArmor(s.getArmor()+pts);
-            case "range"       -> s.setRange(s.getRange()+pts);
-            case "attackspeed" -> s.setAttackSpeed(s.getAttackSpeed()+pts);
-            case "critchance"  -> s.setCritChance(s.getCritChance()+pts);
-            case "critdamage"  -> s.setCritDamage(s.getCritDamage()+pts);
-            case "mana"        -> s.setMana(s.getMana()+pts);
-            case "manaregen"   -> s.setManaregen(s.getManaregen()+pts);
-            case "healthregen" -> s.setHealthregen(s.getHealthregen()+pts);
+            case "damage"      -> s.setBaseDamage(s.getDamage()+pts);
+            case "health"      -> s.setBaseHealth(s.getHealth()+pts);
+            case "armor"       -> s.setBaseArmor(s.getArmor()+pts);
+            case "range"       -> s.setBaseRange(s.getRange()+pts);
+            case "attackspeed" -> s.setBaseAttackSpeed(s.getAttackSpeed()+pts);
+            case "critchance"  -> s.setBaseCritChance(s.getCritChance()+pts);
+            case "critdamage"  -> s.setBaseCritDamage(s.getCritDamage()+pts);
+            case "mana"        -> s.setBaseMana(s.getMana()+pts);
+            case "manaregen"   -> s.setBaseManaRegen(s.getManaRegen()+pts);
+            case "healthregen" -> s.setBaseHealthRegen(s.getHealthRegen()+pts);
+            case "speed" -> s.setBaseSpeed(s.getSpeed()+pts);
         }
     }
 
@@ -295,6 +306,7 @@ public class StatsCommand implements CommandExecutor, TabCompleter {
         double rg  = ps.getRange();
         double hp  = ps.getHealth();
         double ar  = ps.getArmor();
+        double sp  = ps.getSpeed();
 
         double mMax = manaManager.getMax(target);
         double mReg = manaManager.getRegen(target);
@@ -316,6 +328,7 @@ public class StatsCommand implements CommandExecutor, TabCompleter {
                 case "mana"        -> viewer.sendMessage(line(lbl.get("mana"),        n(mMax),       col.get("mana")));
                 case "manaregen"   -> viewer.sendMessage(line(lbl.get("manaregen"),   n(mReg)+"/s",  col.get("manaregen")));
                 case "healthregen" -> viewer.sendMessage(line(lbl.get("healthregen"), n(hpr)+"/s",   col.get("healthregen")));
+                case "speed" -> viewer.sendMessage(line(lbl.get("speed"), n(sp),   col.get("speed")));
             }
         }
 
@@ -345,10 +358,10 @@ public class StatsCommand implements CommandExecutor, TabCompleter {
             return out;
         }
         if (args.length == 3 && (args[0].equalsIgnoreCase("set") || args[0].equalsIgnoreCase("add"))){
-            return Arrays.asList("damage","critchance","critdamage","attackspeed","range","health","armor","mana","manaregen","healthregen");
+            return Arrays.asList("damage","critchance","critdamage","attackspeed","range","health","armor","mana","manaregen","healthregen","speed");
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("allocate")){
-            return Arrays.asList("damage","health","armor","range","attackspeed","critchance","critdamage","mana","manaregen","healthregen");
+            return Arrays.asList("damage","health","armor","range","attackspeed","critchance","critdamage","mana","manaregen","healthregen","speed");
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("allocate")){
             return Collections.singletonList("<punkte>");

@@ -85,9 +85,10 @@ public class PlayerLevel {
         skillPoints += 2; // 2 Skill Points pro Level
 
         // Stats erhöhen (Auto-Scaling)
-        stats.addHealth(5.0);      // +5 HP pro Level
-        stats.addDamage(0.5);      // +0.5 Damage pro Level
-        stats.addArmor(1.0);       // +1 Armor pro Level
+        stats.setBaseHealth(stats.getBaseHealth() + 5.0);    // +5 HP pro Level
+        stats.setBaseDamage(stats.getBaseDamage() + 0.5);    // +0.5 Damage pro Level
+        stats.setBaseArmor(stats.getBaseArmor() + 1.0);      // +1 Armor pro Level
+
 
         // Effekte
         player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
@@ -150,40 +151,48 @@ public class PlayerLevel {
 
         switch (statType.toLowerCase()) {
             case "health", "hp" -> {
-                stats.addHealth(10.0 * multiplier);
+                double inc = 10.0 * multiplier;
+                stats.setBaseHealth(stats.getBaseHealth() + inc);
                 skillPoints -= amount;
-                player.sendMessage("§a+" + (10.0 * multiplier) + " Health! §7(Verbleibende Points: §e" + skillPoints + "§7)");
+                player.sendMessage("§a+" + inc + " Health! §7(Verbleibende Points: §e" + skillPoints + "§7)");
+
+                // MaxHealth auf neuen TOTAL-Wert setzen (Base + Items)
                 player.setMaxHealth(stats.getHealth());
                 return true;
             }
             case "damage", "dmg" -> {
-                stats.addDamage(1.0 * multiplier);
+                double inc = 1.0 * multiplier;
+                stats.setBaseDamage(stats.getBaseDamage() + inc);
                 skillPoints -= amount;
-                player.sendMessage("§a+" + (1.0 * multiplier) + " Damage! §7(Verbleibende Points: §e" + skillPoints + "§7)");
+                player.sendMessage("§a+" + inc + " Damage! §7(Verbleibende Points: §e" + skillPoints + "§7)");
                 return true;
             }
             case "armor", "def" -> {
-                stats.addArmor(2.0 * multiplier);
+                double inc = 2.0 * multiplier;
+                stats.setBaseArmor(stats.getBaseArmor() + inc);
                 skillPoints -= amount;
-                player.sendMessage("§a+" + (2.0 * multiplier) + " Armor! §7(Verbleibende Points: §e" + skillPoints + "§7)");
+                player.sendMessage("§a+" + inc + " Armor! §7(Verbleibende Points: §e" + skillPoints + "§7)");
                 return true;
             }
             case "critchance", "crit" -> {
-                stats.addCritChance(1.0 * multiplier);
+                double inc = 1.0 * multiplier;
+                stats.setBaseCritChance(stats.getBaseCritChance() + inc);
                 skillPoints -= amount;
-                player.sendMessage("§a+" + (1.0 * multiplier) + "% Crit Chance! §7(Verbleibende Points: §e" + skillPoints + "§7)");
+                player.sendMessage("§a+" + inc + "% Crit Chance! §7(Verbleibende Points: §e" + skillPoints + "§7)");
                 return true;
             }
             case "critdamage", "critdmg" -> {
-                stats.addCritDamage(5.0 * multiplier);
+                double inc = 5.0 * multiplier;
+                stats.setBaseCritDamage(stats.getBaseCritDamage() + inc);
                 skillPoints -= amount;
-                player.sendMessage("§a+" + (5.0 * multiplier) + "% Crit Damage! §7(Verbleibende Points: §e" + skillPoints + "§7)");
+                player.sendMessage("§a+" + inc + "% Crit Damage! §7(Verbleibende Points: §e" + skillPoints + "§7)");
                 return true;
             }
             case "range" -> {
-                stats.addRange(0.5 * multiplier);
+                double inc = 0.5 * multiplier;
+                stats.setBaseRange(stats.getBaseRange() + inc);
                 skillPoints -= amount;
-                player.sendMessage("§a+" + (0.5 * multiplier) + " Range! §7(Verbleibende Points: §e" + skillPoints + "§7)");
+                player.sendMessage("§a+" + inc + " Range! §7(Verbleibende Points: §e" + skillPoints + "§7)");
                 return true;
             }
             default -> {
@@ -191,6 +200,7 @@ public class PlayerLevel {
                 return false;
             }
         }
+
     }
 
     // Reset Skill Points (gibt alle ausgegebenen Points zurück)

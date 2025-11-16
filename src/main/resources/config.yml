@@ -69,6 +69,7 @@ lore_colors:
   custom:      "#BFBFBF"
   healthregen: "#FF7777"
   attackspeed: "#FF7777"
+  speed: "FFFFFF"
 
 stats_display:
   order:
@@ -82,6 +83,7 @@ stats_display:
     - mana
     - manaregen
     - healthregen
+    - speed
 
   colors:
     damage:      "#FF5555"
@@ -94,6 +96,7 @@ stats_display:
     mana:        "#55AAFF"
     manaregen:   "#55AAFF"
     healthregen: "#FF77AA"
+    speed:       "#FFFFFF"
 
   labels:
     header_stats: "=== Stats ==="
@@ -107,6 +110,7 @@ stats_display:
     mana: "Mana"
     manaregen: "Mana Regen"
     healthregen: "Health Regen"
+    speed: "Speed"
     header_level: "=== Level & XP ==="
     level: "Level"
     xp: "XP"

@@ -50,16 +50,18 @@ public class StatsStorage {
 
             // Stats-Daten hinzufügen/überschreiben
             json.addProperty("uuid", stats.getPlayerId().toString());
-            json.addProperty("damage", stats.getDamage());
-            json.addProperty("critChance", stats.getCritChance());
-            json.addProperty("critDamage", stats.getCritDamage());
-            json.addProperty("attackSpeed", stats.getAttackSpeed());
-            json.addProperty("range", stats.getRange());
-            json.addProperty("health", stats.getHealth());
-            json.addProperty("armor", stats.getArmor());
-            json.addProperty("mana", stats.getMana());
-            json.addProperty("manareg", stats.getManaregen());
-            json.addProperty("healthreg", stats.getHealthregen());
+            json.addProperty("damage",      stats.getBaseDamage());
+            json.addProperty("critChance",  stats.getBaseCritChance());
+            json.addProperty("critDamage",  stats.getBaseCritDamage());
+            json.addProperty("attackSpeed", stats.getBaseAttackSpeed());
+            json.addProperty("range",       stats.getBaseRange());
+            json.addProperty("health",      stats.getBaseHealth());
+            json.addProperty("armor",       stats.getBaseArmor());
+            json.addProperty("mana",        stats.getBaseMana());
+            json.addProperty("manaRegen",   stats.getBaseManaRegen());
+            json.addProperty("healthRegen", stats.getBaseHealthRegen());
+            json.addProperty("speed",       stats.getBaseSpeed());
+
             json.addProperty("lastSaved", System.currentTimeMillis());
 
             // Speichern
@@ -91,16 +93,18 @@ public class StatsStorage {
 
             PlayerStats stats = new PlayerStats(playerId);
 
-            if (json.has("damage")) stats.setDamage(json.get("damage").getAsDouble());
-            if (json.has("critChance")) stats.setCritChance(json.get("critChance").getAsDouble());
-            if (json.has("critDamage")) stats.setCritDamage(json.get("critDamage").getAsDouble());
-            if (json.has("attackSpeed")) stats.setAttackSpeed(json.get("attackSpeed").getAsDouble());
-            if (json.has("range")) stats.setRange(json.get("range").getAsDouble());
-            if (json.has("health")) stats.setHealth(json.get("health").getAsDouble());
-            if (json.has("armor")) stats.setArmor(json.get("armor").getAsDouble());
-            if (json.has("mana")) stats.setArmor(json.get("mana").getAsDouble());
-            if (json.has("manaregen")) stats.setArmor(json.get("manaregen").getAsDouble());
-            if (json.has("healthregen")) stats.setArmor(json.get("healthregen").getAsDouble());
+            if (json.has("damage"))      stats.setBaseDamage(json.get("damage").getAsDouble());
+            if (json.has("critChance"))  stats.setBaseCritChance(json.get("critChance").getAsDouble());
+            if (json.has("critDamage"))  stats.setBaseCritDamage(json.get("critDamage").getAsDouble());
+            if (json.has("attackSpeed")) stats.setBaseAttackSpeed(json.get("attackSpeed").getAsDouble());
+            if (json.has("range"))       stats.setBaseRange(json.get("range").getAsDouble());
+            if (json.has("health"))      stats.setBaseHealth(json.get("health").getAsDouble());
+            if (json.has("armor"))       stats.setBaseArmor(json.get("armor").getAsDouble());
+            if (json.has("mana"))        stats.setBaseMana(json.get("mana").getAsDouble());
+            if (json.has("manaRegen"))   stats.setBaseManaRegen(json.get("manaRegen").getAsDouble());
+            if (json.has("healthRegen")) stats.setBaseHealthRegen(json.get("healthRegen").getAsDouble());
+            if (json.has("speed"))       stats.setBaseSpeed(json.get("speed").getAsDouble());
+
 
             plugin.getLogger().info("✓ Stats erfolgreich geladen für: " + playerId);
             return stats;

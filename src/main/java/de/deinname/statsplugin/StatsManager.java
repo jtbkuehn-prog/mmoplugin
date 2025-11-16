@@ -7,6 +7,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
+import org.bukkit.entity.Player;
 
 
 public class StatsManager {
@@ -25,7 +28,7 @@ public class StatsManager {
     }
 
     // Merker für zuletzt angewendete Item-Boni
-    private static final class ItemBonus { double d, cc, cd, hp, ar, rg, as; ItemBonus(double d,double cc,double cd,double hp,double ar,double rg, double as){this.d=d;this.cc=cc;this.cd=cd;this.hp=hp;this.ar=ar;this.rg=rg;this.as=as;} }
+    private static final class ItemBonus { double d, cc, cd, hp, ar, rg, as, sp; ItemBonus(double d,double cc,double cd,double hp,double ar,double rg, double as,double sp){this.d=d;this.cc=cc;this.cd=cd;this.hp=hp;this.ar=ar;this.rg=rg;this.as=as;this.sp=sp;} }
     private final java.util.Map<java.util.UUID, ItemBonus> lastItemBonus = new java.util.HashMap<>();
 
     // Lädt oder erstellt Stats für einen Spieler
@@ -94,7 +97,7 @@ public class StatsManager {
 
     // Gesamt-HealthRegen = Base (in PlayerStats) + Item
     public double getTotalHealthRegen(Player p) {
-        double base = getStats(p).getHealthregen();        // aus PlayerStats (via /stats set)
+        double base = getStats(p).getHealthRegen();        // aus PlayerStats (via /stats set)
         double item = getItemHealthRegen(p.getUniqueId()); // aus Items
         return Math.max(0.0, base) + Math.max(0.0, item);
     }
@@ -105,11 +108,26 @@ public class StatsManager {
         player.setMaxHealth(stats.getHealth());
     }
 
+    public void applySpeed(Player p) {
+        PlayerStats s = getStats(p);
+        if (s == null) return;
+
+        AttributeInstance attr = p.getAttribute(Attribute.MOVEMENT_SPEED);
+        if (attr == null) return;
+
+        double base = 0.1; // Vanilla-Default
+        double bonusPercent = s.getSpeed();
+        double value = base * (bonusPercent / 100.0);
+
+        attr.setBaseValue(value);
+    }
+
     // Alle Stats zurücksetzen
     public void resetStats(Player player) {
         PlayerStats stats = new PlayerStats(player.getUniqueId());
         playerStats.put(player.getUniqueId(), stats);
         applyHealth(player);
+        applySpeed(player);
     }
 
     // Alle Stats clearen (z.B. beim Plugin-Disable) und speichern
@@ -148,29 +166,47 @@ public class StatsManager {
         }
     }
 
-    public void applyItemBonuses(java.util.UUID id, double damage, double critC, double critD, double health, double armor, double range, double attackspeed){
+    public void applyItemBonuses(java.util.UUID id, double damage, double critC, double critD, double health, double armor, double range, double attackspeed, double speed){
         PlayerStats s = playerStats.get(id);
         if (s == null) return;
-        ItemBonus prev = lastItemBonus.getOrDefault(id, new ItemBonus(0,0,0,0,0,0,0));
+        ItemBonus prev = lastItemBonus.getOrDefault(id, new ItemBonus(0,0,0,0,0,0,0, 0));
         double dDamage = damage - prev.d;
         double dCritC = critC - prev.cc;
         double dCritD = critD - prev.cd;
         double dHealth = health - prev.hp;
         double dArmor = armor - prev.ar;
         double dRange = range - prev.rg;
-        double dAttackspeed = attackspeed - prev.rg;
+        double dAttackspeed = attackspeed - prev.as;
+        double dSpeed = speed - prev.sp;
 
 
-        if (dDamage != 0) s.addDamage(dDamage);
-        if (dCritC != 0) s.addCritChance(dCritC);
-        if (dCritD != 0) s.addCritDamage(dCritD);
-        if (dArmor != 0) s.addArmor(dArmor);
-        if (dRange != 0) s.addRange(dRange);
-        if (dHealth != 0) s.addHealth(dHealth);
-        if (dAttackspeed != 0) s.addAttackSpeed(dAttackspeed);
+        if (dDamage != 0)
+            s.setBaseDamage(s.getBaseDamage() + dDamage);
+
+        if (dCritC != 0)
+            s.setBaseCritChance(s.getBaseCritChance() + dCritC);
+
+        if (dCritD != 0)
+            s.setBaseCritDamage(s.getBaseCritDamage() + dCritD);
+
+        if (dArmor != 0)
+            s.setBaseArmor(s.getBaseArmor() + dArmor);
+
+        if (dRange != 0)
+            s.setBaseRange(s.getBaseRange() + dRange);
+
+        if (dHealth != 0)
+            s.setBaseHealth(s.getBaseHealth() + dHealth);
+
+        if (dAttackspeed != 0)
+            s.setBaseAttackSpeed(s.getBaseAttackSpeed() + dAttackspeed);
+
+        if (dSpeed != 0)
+            s.setBaseSpeed(s.getBaseSpeed() + dSpeed);
 
 
-        lastItemBonus.put(id, new ItemBonus(damage, critC, critD, health, armor, range, attackspeed));
+
+        lastItemBonus.put(id, new ItemBonus(damage, critC, critD, health, armor, range, attackspeed, speed));
     }
 
 }

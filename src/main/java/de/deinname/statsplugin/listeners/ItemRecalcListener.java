@@ -60,31 +60,47 @@ public class ItemRecalcListener implements Listener {
     }
 
     private void recalc(Player p){
-        // Items summieren (Rüstung + Mainhand + Offhand, falls du Offhand-Stats willst)
+        // PlayerStats holen
+        var ps = stats.getStats(p);
+        if (ps == null) return;
+
+        // Items summieren (Rüstung + Mainhand + Offhand)
         ItemStats total = ItemStats.zero();
         for (ItemStack armor : p.getInventory().getArmorContents()) {
             total = total.add(ItemStatUtils.read(armor, keys));
         }
         total = total.add(ItemStatUtils.read(p.getInventory().getItemInMainHand(), keys));
-        total = total.add(ItemStatUtils.read(p.getInventory().getItemInOffHand(), keys)); // optional — rausnehmen, wenn Offhand nichts geben soll
+        total = total.add(ItemStatUtils.read(p.getInventory().getItemInOffHand(), keys)); // Offhand optional
 
-        // Item-Werte in Manager übernehmen
-        stats.applyItemBonuses(
-                p.getUniqueId(),
-                total.damage(), total.critChance(), total.critDamage(),
-                total.health(), total.armor(), total.range(), total.attackspeed()
-        );
+        // 1) ALLE alten Item-Boni löschen
+        ps.clearItemBonuses();
+
+        // 2) Item-Boni in PlayerStats eintragen (NUR itemX-Felder!)
+        ps.addItemDamage(total.damage());
+        ps.addItemCritChance(total.critChance());
+        ps.addItemCritDamage(total.critDamage());
+        ps.addItemHealth(total.health());
+        ps.addItemArmor(total.armor());
+        ps.addItemRange(total.range());
+        ps.addItemAttackSpeed(total.attackspeed());
+        ps.addItemMana(total.manaMax());          // falls du itemMana nutzen willst
+        ps.addItemManaRegen(total.manaRegen());
+        ps.addItemHealthRegen(total.healthRegen());
+        ps.addItemSpeed(total.speed());
+
+        // 3) Health anhand der neuen Total-Stats anwenden (Base + Items)
         stats.applyHealth(p);
+        stats.applySpeed(p);
 
-        // Item-HealthRegen in die Item-Map (du hattest 1–4 schon umgesetzt)
-        stats.setItemHealthRegen(p.getUniqueId(), total.healthRegen());
-
-        // Mana (base aus Level + items)
+        // 4) Mana separat über ManaManager (wie vorher)
         int lvl = stats.getLevel(p).getLevel();
-        double baseMax   = plugin.getConfig().getDouble("mana.base-max", 50.0) + lvl * plugin.getConfig().getDouble("mana.per-level", 5.0);
-        double baseRegen = plugin.getConfig().getDouble("mana.base-regen", 1.0) + lvl * plugin.getConfig().getDouble("mana.regen-per-level", 0.1);
+        double baseMax   = plugin.getConfig().getDouble("mana.base-max", 50.0)
+                + lvl * plugin.getConfig().getDouble("mana.per-level", 5.0);
+        double baseRegen = plugin.getConfig().getDouble("mana.base-regen", 1.0)
+                + lvl * plugin.getConfig().getDouble("mana.regen-per-level", 0.1);
+
         mana.setMax(p,   baseMax   + total.manaMax());
         mana.setRegen(p, baseRegen + total.manaRegen());
-
     }
+
 }

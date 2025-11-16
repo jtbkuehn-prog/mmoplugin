@@ -2,111 +2,163 @@ package de.deinname.statsplugin;
 
 import java.util.UUID;
 
-public class PlayerStats {
-    private final UUID playerId;
 
-    // Base Stats
-    private double damage;
-    private double critChance;
-    private double critDamage;
-    private double range;
-    private double health;
-    private double armor;
-    private double attackSpeed;
-    private double mana;
-    private double manaregen;
-    private double healthregen;
+public class PlayerStats {
+
+
+    // ==== META-DATEN ====
+    private final UUID playerId;
+    private int level = 1;
+    private double xp = 0.0;
+    private int skillPoints = 0;
 
     public PlayerStats(UUID playerId) {
         this.playerId = playerId;
-        // Default Werte
-        this.damage = 5.0;
-        this.critChance = 5.0; // 5%
-        this.critDamage = 150.0; // 150% = 1.5x Schaden
-        this.range = 3.0;
-        this.health = 20.0;
-        this.armor = 0.0;
-        this.attackSpeed = 2.0;
-        this.mana = 50.0;
-        this.manaregen = 2.0;
-        this.healthregen = 2.0;
     }
 
-    // Getter
-    public UUID getPlayerId() { return playerId; }
-    public double getDamage() { return damage; }
-    public double getCritChance() { return critChance; }
-    public double getCritDamage() { return critDamage; }
-    public double getRange() { return range; }
-    public double getHealth() { return health; }
-    public double getArmor() { return armor; }
-    public double getAttackSpeed() { return attackSpeed; }
-    public double getMana() { return mana; }
-    public double getManaregen() { return manaregen; }
-    public double getHealthregen() { return healthregen; }
-
-    // Setter
-    public void setDamage(double damage) { this.damage = damage; }
-    public void setCritChance(double critChance) { this.critChance = Math.min(100, critChance); }
-    public void setCritDamage(double critDamage) { this.critDamage = critDamage; }
-    public void setRange(double range) { this.range = range; }
-    public void setHealth(double health) { this.health = Math.max(1, health); }
-    public void setArmor(double armor) { this.armor = armor; }
-    public void setAttackSpeed(double attackSpeed) { this.attackSpeed = Math.max(0.1, attackSpeed); }
-    public void setMana(double mana) { this.mana = Math.max(0.1, mana); }
-    public void setManaregen(double manaregen) { this.manaregen = Math.max(0.1, manaregen); }
-    public void setHealthregen(double healthregen) { this.healthregen = Math.max(0.1, healthregen); }
-
-    // Add/Remove Methoden für Items/Buffs
-    public void addDamage(double amount) { this.damage += amount; }
-    public void addCritChance(double amount) {
-        this.critChance = Math.min(100, this.critChance + amount);
-    }
-    public void addCritDamage(double amount) { this.critDamage += amount; }
-    public void addRange(double amount) { this.range += amount; }
-    public void addHealth(double amount) { this.health += amount; }
-    public void addArmor(double amount) { this.armor += amount; }
-    public void addAttackSpeed(double amount) { setAttackSpeed(this.attackSpeed + amount); }
-    public void addMana(double amount) { setMana(this.mana + amount); }
-    public void addManaregen(double amount) { setManaregen(this.manaregen + amount); }
-    public void addHealthregen(double amount) { setHealthregen(this.healthregen + amount); }
-
-    // Berechnet ob ein Crit erfolgt
-    public boolean rollCrit() {
-        return Math.random() * 100 < critChance;
+    public UUID getPlayerId() {
+        return playerId;
     }
 
-    // Berechnet finalen Schaden mit Crit
-    public double calculateDamage(boolean isCrit) {
-        if (isCrit) {
-            return damage * (critDamage / 100.0);
-        }
-        return damage;
+    public int getLevel() {
+        return level;
+    }
+    public void setLevel(int level) {
+        this.level = level;
     }
 
-    // Berechnet Schaden nach Armor-Reduktion
-    public double calculateDamageReduction(double incomingDamage) {
-        // Formel: Schaden * (100 / (100 + Armor))
-        double reduction = 100.0 / (100.0 + armor);
-        return incomingDamage * reduction;
+    public double getXp() {
+        return xp;
+    }
+    public void setXp(double xp) {
+        this.xp = xp;
     }
 
-    @Override
-    public String toString() {
-        return String.format(
-                "§6=== Stats ===\n" +
-                        "§cDamage: §f%.1f\n" +
-                        "§eCrit Chance: §f%.1f%%\n" +
-                        "§eCrit Damage: §f%.0f%%\n" +
-                        "§dAttack Speed: §f%.1f/s\n" +
-                        "§bRange: §f%.1f\n" +
-                        "§aHealth: §f%.1f\n" +
-                        "§7Armor: §f%.1f",
-                        "§7Mana: §f%.1f",
-                        "§7Manaregen: §f%.1f",
-                        "§7Healthregen: §f%.1f",
-                damage, critChance, critDamage, attackSpeed, range, health, armor, mana, manaregen, healthregen
-        );
+    public int getSkillPoints() {
+        return skillPoints;
+    }
+    public void setSkillPoints(int skillPoints) {
+        this.skillPoints = skillPoints;
     }
 
+
+    // ==== BASIS-WERTE (werden gespeichert) ====
+    private double baseDamage      = 5.0;
+    private double baseCritChance  = 5.0;
+    private double baseCritDamage  = 150.0;
+    private double baseAttackSpeed = 1.0;
+    private double baseRange       = 3.0;
+    private double baseHealth      = 20.0;
+    private double baseArmor       = 0.0;
+    private double baseMana        = 50.0;
+    private double baseManaRegen   = 1.0;
+    private double baseHealthRegen = 1.0;
+    private double baseSpeed = 100.0;      // % Laufgeschwindigkeit (0 = normal)
+
+    // ==== ITEM-BONI (werden NICHT gespeichert) ====
+    private double itemDamage      = 0.0;
+    private double itemCritChance  = 0.0;
+    private double itemCritDamage  = 0.0;
+    private double itemAttackSpeed = 0.0;
+    private double itemRange       = 0.0;
+    private double itemHealth      = 0.0;
+    private double itemArmor       = 0.0;
+    private double itemMana        = 0.0;
+    private double itemManaRegen   = 0.0;
+    private double itemHealthRegen = 0.0;
+    private double itemSpeed = 0.0;
+
+    // ==== ITEM-BONI zurücksetzen (wird von ItemRecalcListener genutzt) ====
+    public void clearItemBonuses() {
+        itemDamage = 0.0;
+        itemCritChance = 0.0;
+        itemCritDamage = 0.0;
+        itemAttackSpeed = 0.0;
+        itemRange = 0.0;
+        itemHealth = 0.0;
+        itemArmor = 0.0;
+        itemMana = 0.0;
+        itemManaRegen = 0.0;
+        itemHealthRegen = 0.0;
+        itemSpeed = 0.0;
+    }
+
+    // ==== Item-Bonus hinzufügen (pro Stat) ====
+    public void addItemDamage(double v)      { itemDamage      += v; }
+    public void addItemCritChance(double v)  { itemCritChance  += v; }
+    public void addItemCritDamage(double v)  { itemCritDamage  += v; }
+    public void addItemAttackSpeed(double v) { itemAttackSpeed += v; }
+    public void addItemRange(double v)       { itemRange       += v; }
+    public void addItemHealth(double v)      { itemHealth      += v; }
+    public void addItemArmor(double v)       { itemArmor       += v; }
+    public void addItemMana(double v)        { itemMana        += v; }
+    public void addItemManaRegen(double v)   { itemManaRegen   += v; }
+    public void addItemHealthRegen(double v) { itemHealthRegen += v; }
+    public void addItemSpeed(double v)       { itemSpeed += v; }
+
+
+    // ==== TOTAL-WERTE (Base + Items) – werden überall im Combat verwendet ====
+
+    public double getDamage()      { return baseDamage      + itemDamage; }
+    public double getCritChance()  { return baseCritChance  + itemCritChance; }
+    public double getCritDamage()  { return baseCritDamage  + itemCritDamage; }
+    public double getAttackSpeed() { return baseAttackSpeed + itemAttackSpeed; }
+    public double getRange()       { return baseRange       + itemRange; }
+    public double getHealth()      { return baseHealth      + itemHealth; }
+    public double getArmor()       { return baseArmor       + itemArmor; }
+    public double getMana()        { return baseMana        + itemMana; }
+    public double getManaRegen()   { return baseManaRegen   + itemManaRegen; }
+    public double getHealthRegen() { return baseHealthRegen + itemHealthRegen; }
+    public double getSpeed() { return baseSpeed + itemSpeed; }
+
+
+    // ==== BASE-GETTER/SETTER (für /stats & SPEICHERN) ====
+
+    public double getBaseDamage() { return baseDamage; }
+    public void setBaseDamage(double v) { this.baseDamage = v; }
+
+    public double getBaseCritChance() { return baseCritChance; }
+    public void setBaseCritChance(double v) { this.baseCritChance = v; }
+
+    public double getBaseCritDamage() { return baseCritDamage; }
+    public void setBaseCritDamage(double v) { this.baseCritDamage = v; }
+
+    public double getBaseAttackSpeed() { return baseAttackSpeed; }
+    public void setBaseAttackSpeed(double v) { this.baseAttackSpeed = v; }
+
+    public double getBaseRange() { return baseRange; }
+    public void setBaseRange(double v) { this.baseRange = v; }
+
+    public double getBaseHealth() { return baseHealth; }
+    public void setBaseHealth(double v) { this.baseHealth = v; }
+
+    public double getBaseArmor() { return baseArmor; }
+    public void setBaseArmor(double v) { this.baseArmor = v; }
+
+    public double getBaseMana() { return baseMana; }
+    public void setBaseMana(double v) { this.baseMana = v; }
+
+    public double getBaseManaRegen() { return baseManaRegen; }
+    public void setBaseManaRegen(double v) { this.baseManaRegen = v; }
+
+    public double getBaseHealthRegen() { return baseHealthRegen; }
+    public void setBaseHealthRegen(double v) { this.baseHealthRegen = v; }
+
+    public double getBaseSpeed() { return baseSpeed; }
+    public void setBaseSpeed(double v) { this.baseSpeed = v; }
+
+
+    // ==== KOMPATIBLE SETTER (falls irgendwo setDamage(...) etc. genutzt werden) ====
+
+    public void setDamage(double v)      { this.baseDamage      = v; }
+    public void setCritChance(double v)  { this.baseCritChance  = v; }
+    public void setCritDamage(double v)  { this.baseCritDamage  = v; }
+    public void setAttackSpeed(double v) { this.baseAttackSpeed = v; }
+    public void setRange(double v)       { this.baseRange       = v; }
+    public void setHealth(double v)      { this.baseHealth      = v; }
+    public void setArmor(double v)       { this.baseArmor       = v; }
+    public void setMana(double v)        { this.baseMana        = v; }
+    public void setManaRegen(double v)   { this.baseManaRegen   = v; }
+    public void setHealthRegen(double v) { this.baseHealthRegen = v; }
+    public void setSpeed(double v) { this.baseSpeed = v; }
 }

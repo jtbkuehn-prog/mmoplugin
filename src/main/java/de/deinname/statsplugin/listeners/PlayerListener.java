@@ -28,6 +28,7 @@ public class PlayerListener implements Listener {
         statsManager.getStats(event.getPlayer());
         // Health anwenden
         statsManager.applyHealth(event.getPlayer());
+        statsManager.applySpeed(event.getPlayer());
 
         event.getPlayer().sendMessage("§aStats-System geladen!");
     }

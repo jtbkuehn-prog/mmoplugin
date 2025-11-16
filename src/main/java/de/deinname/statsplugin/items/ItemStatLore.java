@@ -43,6 +43,7 @@ public final class ItemStatLore {
         addLine(lore, s.range(), "+%s Range");
         addLine(lore, s.manaMax(), "+%s Mana");
         addLine(lore, s.manaRegen(), "+%s Mana Regeneration/s");
+        addLine(lore, s.manaRegen(), "+%s Speed");
 
         meta.lore(lore);
         is.setItemMeta(meta);
