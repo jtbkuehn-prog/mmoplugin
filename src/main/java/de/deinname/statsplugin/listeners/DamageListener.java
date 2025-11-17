@@ -6,90 +6,127 @@ import de.deinname.statsplugin.abilities.DamageBoostState;
 import de.deinname.statsplugin.combat.CustomReach;
 import de.deinname.statsplugin.util.DamageNumbers;
 import org.bukkit.Particle;
-import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
-import org.bukkit.entity.Projectile;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
-import de.deinname.statsplugin.listeners.AttackListener;
+import org.bukkit.event.entity.EntityDamageEvent;
 
 import java.util.UUID;
-import java.util.Vector;
 import java.util.concurrent.ThreadLocalRandom;
 
-/**
- * Zentraler Schaden:
- * - Prüft zuerst Extended-Reach-Override (CustomReach).
- * - Wenn kein Override: klassischer Range-Check mit Eye->Center.
- * - Danach Crit, Armor, DamageBoost und final setDamage.
- */
 public class DamageListener implements Listener {
 
     private final StatsManager statsManager;
     private final DamageNumbers numbers;
-
-    // klassische Vanilla-Obergrenze, nur als Info
-    private static final double VANILLA_REACH_FUZZ = 4.5;
 
     public DamageListener(StatsManager statsManager, DamageNumbers numbers) {
         this.statsManager = statsManager;
         this.numbers = numbers;
     }
 
-    // Früh rein, damit Range/Overrides vor Rest greifen
-    @EventHandler(priority = EventPriority.LOWEST)
+    /**
+     * Zentrale Schadenslogik für Entity-zu-Entity-Schaden:
+     * - Wenn Damager Spieler: benutze Stats, Crit, DamageBoost, Range.
+     * - Wenn Damager kein Spieler: benutze Vanilla-FinalDamage als Basis.
+     * - Wenn Ziel Spieler: wende Schaden auf Custom-HP an (currentHealth).
+     * - Wenn Ziel Mob: wende Schaden auf dessen Health an (setHealth).
+     */
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onDamage(EntityDamageByEntityEvent e) {
-        if (!(e.getDamager() instanceof Player attacker)) return;
-        if (!(e.getEntity() instanceof LivingEntity victim)) return;
+        Entity damager = e.getDamager();
+        Entity entity = e.getEntity();
 
-        PlayerStats atk = statsManager.getStats(attacker);
-        if (atk == null) return;
-
-        // --- 1) Extended-Reach-Override? ---
-        boolean allowExtended = CustomReach.consumeIfMatches(attacker.getUniqueId(), victim);
-
-        // --- 2) Range-Check (Eye -> Center), nur wenn KEIN Override ---
-        if (!allowExtended) {
-            double dist = attacker.getEyeLocation().distance(victim.getLocation().add(0, victim.getHeight() * 0.5, 0));
-            if (dist > atk.getRange()) {
-                e.setCancelled(true);
-                attacker.sendActionBar(net.kyori.adventure.text.Component.text(
-                        "Zu weit: " + String.format("%.1f", dist) + " / " + String.format("%.1f", atk.getRange())
-                ));
-                return;
-            }
+        if (!(entity instanceof LivingEntity victim)) {
+            return;
         }
 
-        // --- 3) Eigene Schadensberechnung ---
-        boolean crit = rollCrit(atk.getCritChance());
-        double damage = atk.getDamage();
-        if (crit) damage *= (atk.getCritDamage() / 100.0);
+        double damage;
+        boolean crit = false;
+
+        // --- 1) Wenn Damager ein Spieler ist -> eigene Stats, Range, Crit, DamageBoost ---
+        if (damager instanceof Player attacker) {
+            PlayerStats atk = statsManager.getStats(attacker);
+            if (atk == null) return;
+
+            // Extended-Reach-Override?
+            boolean allowExtended = CustomReach.consumeIfMatches(attacker.getUniqueId(), victim);
+
+            // Range-Check (nur wenn kein Override)
+            if (!allowExtended) {
+                double dist = attacker.getEyeLocation().distance(
+                        victim.getLocation().add(0, victim.getHeight() * 0.5, 0)
+                );
+                if (dist > atk.getRange()) {
+                    e.setCancelled(true);
+                    attacker.sendActionBar(net.kyori.adventure.text.Component.text(
+                            "Zu weit: " + String.format("%.1f", dist) + " / " + String.format("%.1f", atk.getRange())
+                    ));
+                    return;
+                }
+            }
+
+            // Basis-Schaden + Crit
+            crit = rollCrit(atk.getCritChance());
+            damage = atk.getDamage();
+            if (crit) {
+                damage *= (atk.getCritDamage() / 100.0);
+            }
+
+            // Damage-Boost
+            UUID aid = attacker.getUniqueId();
+            if (DamageBoostState.isActive(aid)) {
+                damage *= DamageBoostState.getMultiplier(aid);
+            }
+
+        } else {
+            // --- 2) Damager ist KEIN Spieler (Zombie, Skelett, etc.) ---
+            // Wir nehmen einfach den Vanilla-FinalDamage als Basis.
+            damage = e.getFinalDamage();
+        }
+
+        // --- 3) Schaden anwenden je nach Ziel-Typ ---
 
         if (victim instanceof Player def) {
+            // Custom-HP für Spieler
             PlayerStats defStats = statsManager.getStats(def);
-            if (defStats != null) damage = Math.max(0.0, damage - defStats.getArmor());
+            if (defStats == null) return;
+
+            double maxHp = defStats.getHealth();          // Max-HP (Base + Items)
+            if (maxHp <= 0) maxHp = 1.0;
+
+            double curHp = defStats.getCurrentHealth();   // aktuelle HP
+            if (curHp <= 0 || curHp > maxHp) {
+                curHp = maxHp;
+            }
+
+            double newHp = curHp - damage;
+
+            if (newHp <= 0) {
+                // Spieler stirbt in unserem System
+                defStats.setCurrentHealth(0.0);
+
+                // Vanilla-Tod auslösen (Death-Screen, Respawn, etc.)
+                e.setDamage(1000.0); // genug, um sicher zu töten
+            } else {
+                // Spieler überlebt
+                defStats.setCurrentHealth(newHp);
+                e.setDamage(0.0); // KEIN Vanilla-Schaden mehr auf Herzen
+            }
+
+        } else {
+            // --- 4) Mobs / andere LivingEntities: Custom-Schaden direkt anwenden ---
+            double before = victim.getHealth();
+            double after = Math.max(0.0, before - damage);
+
+            e.setDamage(0.0); // Vanilla-Schaden verhindern
+            victim.setHealth(after);
         }
 
-        // Damage-Boost anwenden
-        UUID aid = attacker.getUniqueId();
-        if (DamageBoostState.isActive(aid)) {
-            damage *= DamageBoostState.getMultiplier(aid);
-        }
-
-// 4) Vanilla-Schaden ausschalten
-// (wir setzen ihn auf 0, lassen das Event aber NICHT cancelled -> Killer bleibt für XP)
-        e.setDamage(0.0);
-
-// 5) Eigenen Schaden auf die HP anwenden
-        double before = victim.getHealth();
-        double after = Math.max(0.0, before - damage);
-        victim.setHealth(after);
-
-// 6) Feedback: Damage-Number & Crit-Partikel
+        // --- 5) Feedback: Damage-Number & Crit-Partikel ---
         numbers.show(victim.getWorld(), victim.getLocation(), damage, crit);
         if (crit) {
             victim.getWorld().spawnParticle(
@@ -104,4 +141,89 @@ public class DamageListener implements Listener {
         if (critChancePercent <= 0) return false;
         return ThreadLocalRandom.current().nextDouble(0.0, 100.0) < critChancePercent;
     }
+
+    /**
+     * Allgemeiner Handler für NICHT-Entity-Schaden (Fall, Feuer, Lava, Explosion, etc.)
+     * Alles, was nicht über EntityDamageByEntityEvent kommt, landet hier.
+     */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onGenericDamage(EntityDamageEvent e) {
+        // EntityDamageByEntityEvents werden bereits oben behandelt
+        if (e instanceof EntityDamageByEntityEvent) return;
+
+        if (!(e.getEntity() instanceof Player p)) return;
+
+        PlayerStats ps = statsManager.getStats(p);
+        if (ps == null) return;
+
+        double maxHp = ps.getHealth();          // dein MaxHP (Base + Items)
+        if (maxHp <= 0) maxHp = 1.0;
+
+        double curHp = ps.getCurrentHealth();   // dein aktuelles HP
+        if (curHp <= 0 || curHp > maxHp) {
+            curHp = maxHp;                      // initialisieren/clampen
+        }
+
+        // --- Basis-Schaden von Vanilla holen ---
+        double base = e.getFinalDamage();
+        if (base <= 0.0) {
+            e.setDamage(0.0);
+            return;
+        }
+
+        // --- Skalierung je nach Ursache ---
+        double dmg = base;
+        double scale = 1.0;
+        double maxFraction = 0.0; // 0 = kein Cap
+
+        switch (e.getCause()) {
+            case LAVA, FIRE, FIRE_TICK -> {
+                // Lava/Feuer: eher DoT, aber nicht instant Kill
+                scale = 0.25;          // halber Vanilla-Schaden
+                maxFraction = 0.10;   // pro Tick max 10% MaxHP
+            }
+            case HOT_FLOOR -> { // Magma-Block
+                scale = 0.25;         // Viertel des Vanilla-Schadens
+                maxFraction = 0.05;   // max 5% MaxHP pro Tick
+            }
+            case CONTACT -> { // Kaktus
+                scale = 0.25;
+                maxFraction = 0.03;   // 3% HP max pro Tick
+            }
+            case POISON -> {
+                scale = 0.3;
+                maxFraction = 0.05;
+            }
+            // andere Ursachen behalten erstmal 1:1 Schaden
+            default -> {
+                scale = 1.0;
+                maxFraction = 0.0;
+            }
+        }
+
+        dmg = base * scale;
+        if (maxFraction > 0.0) {
+            dmg = Math.min(dmg, maxHp * maxFraction);
+        }
+
+        if (dmg <= 0.0) {
+            e.setDamage(0.0);
+            return;
+        }
+
+        double newHp = curHp - dmg;
+
+        if (newHp <= 0) {
+            // Im eigenen System tot
+            ps.setCurrentHealth(0.0);
+
+            // Bukkit wirklich töten lassen (Death-Screen / Respawn)
+            e.setDamage(1000.0); // genug, um den Spieler sicher zu killen
+        } else {
+            // Spieler überlebt: nur Custom-HP runter, Vanilla-Schaden unterdrücken
+            ps.setCurrentHealth(newHp);
+            e.setDamage(0.0); // keine Vanilla-Herzen verlieren
+        }
+    }
+
 }

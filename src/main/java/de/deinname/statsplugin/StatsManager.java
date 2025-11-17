@@ -102,11 +102,30 @@ public class StatsManager {
         return Math.max(0.0, base) + Math.max(0.0, item);
     }
 
-    // Setzt Health des Spielers basierend auf Stats
-    public void applyHealth(Player player) {
-        PlayerStats stats = getStats(player);
-        player.setMaxHealth(stats.getHealth());
+    public void applyHealth(Player p) {
+        PlayerStats s = getStats(p);
+        if (s == null) return;
+
+        double max = s.getHealth();
+        if (max <= 0) max = 1.0;
+
+        // currentHealth clampen
+        if (s.getCurrentHealth() <= 0 || s.getCurrentHealth() > max) {
+            s.setCurrentHealth(max);
+        }
+
+        // Bukkit-Health minimal auf "lebt" halten (z.B. 20 Herzen oder 1 HP)
+        var attr = p.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH);
+        if (attr != null) {
+            attr.setBaseValue(20.0); // Vanilla sagt 20 HP, aber wir ignorieren das als echten Wert
+        }
+        if (p.getHealth() <= 0.0) {
+            p.setHealth(20.0);
+        } else if (p.getHealth() > 20.0) {
+            p.setHealth(20.0);
+        }
     }
+
 
     public void applySpeed(Player p) {
         PlayerStats s = getStats(p);

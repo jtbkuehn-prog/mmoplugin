@@ -69,9 +69,11 @@ public class StatsPlugin extends JavaPlugin {
         getServer().getScheduler().runTaskTimer(this, () -> {
             for (var p : getServer().getOnlinePlayers()) {
 
-                if (!p.isOnline() || p.isDead() || p.getHealth() <= 0.0) {
+                if (!p.isOnline() || p.isDead())
                     continue;
-                }
+
+                var stats = statsManager.getStats(p);
+                if (stats == null) continue;
 
                 // Mana-Regeneration
                 manaManager.tick(p);
@@ -81,10 +83,7 @@ public class StatsPlugin extends JavaPlugin {
                 if (hpr > 0) {
                     double dt = 0.5; // 10 Ticks
                     double add = hpr * dt;
-                    double max = p.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH).getValue();
-                    double cur = p.getHealth();
-                    double next = Math.min(max, cur + add);
-                    if (next > cur) p.setHealth(next);
+                   stats.heal(add);
                 }
 
                 // Hunger „freezen“
@@ -93,8 +92,8 @@ public class StatsPlugin extends JavaPlugin {
                 p.setExhaustion(0f);
 
                 // HUD (ActionBar)
-                int hp = (int) Math.ceil(p.getHealth());
-                int hpMax = (int) Math.ceil(p.getMaxHealth());
+                int hp = (int) Math.ceil(stats.getCurrentHealth());
+                int hpMax = (int) Math.ceil(stats.getHealth());
                 int m = (int) Math.ceil(manaManager.get(p));
                 int mMax = (int) Math.ceil(manaManager.getMax(p));
 
@@ -112,14 +111,14 @@ public class StatsPlugin extends JavaPlugin {
 
         // Online-Spieler initialisieren
         getServer().getOnlinePlayers().forEach(p -> {
-            statsManager.getStats(p);
-            statsManager.applyHealth(p);
-            statsManager.applySpeed(p);
+            PlayerStats stats = statsManager.getStats(p);
+            stats.setCurrentHealth(stats.getHealth()); // volles Custom-HP
+            statsManager.applySpeed(p);                // Speed-Stat
             p.setFoodLevel(20);
             p.setSaturation(20f);
             p.setExhaustion(0f);
-            // KEIN setHealthScaled/setHealthScale mehr -> kein „halbes Herz“
         });
+
 
         // Auto-Save
         new BukkitRunnable() { @Override public void run() { statsManager.saveAll(); } }

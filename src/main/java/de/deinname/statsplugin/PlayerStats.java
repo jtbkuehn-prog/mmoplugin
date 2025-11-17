@@ -68,6 +68,11 @@ public class PlayerStats {
     private double itemHealthRegen = 0.0;
     private double itemSpeed = 0.0;
 
+    // ==== CURRENT HP (MMO-Health, unabhängig von Bukkit) ====
+    private double currentHealth = -1.0; // -1 = noch nicht initialisiert
+
+
+
     // ==== ITEM-BONI zurücksetzen (wird von ItemRecalcListener genutzt) ====
     public void clearItemBonuses() {
         itemDamage = 0.0;
@@ -146,6 +151,31 @@ public class PlayerStats {
 
     public double getBaseSpeed() { return baseSpeed; }
     public void setBaseSpeed(double v) { this.baseSpeed = v; }
+
+
+
+    public double getCurrentHealth() {
+        // Fallback, falls noch nie gesetzt:
+        if (currentHealth <= 0) {
+            currentHealth = getHealth(); // Max-HP als Startwert
+        }
+        return currentHealth;
+    }
+
+    public void setCurrentHealth(double value) {
+        double max = getHealth();
+        if (max <= 0) max = 1.0;
+        this.currentHealth = Math.max(0.0, Math.min(value, max));
+    }
+
+    public void heal(double amount) {
+        setCurrentHealth(getCurrentHealth() + amount);
+    }
+
+    public void damage(double amount) {
+        setCurrentHealth(getCurrentHealth() - amount);
+    }
+
 
 
     // ==== KOMPATIBLE SETTER (falls irgendwo setDamage(...) etc. genutzt werden) ====
