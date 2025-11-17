@@ -176,6 +176,13 @@ public class PlayerStats {
         setCurrentHealth(getCurrentHealth() - amount);
     }
 
+    public double getTotalMana() {
+        return baseMana + itemMana; // siehe applyItemBonuses
+    }
+
+    public double getTotalManaRegen() {
+        return baseManaRegen + itemManaRegen;
+    }
 
 
     // ==== KOMPATIBLE SETTER (falls irgendwo setDamage(...) etc. genutzt werden) ====

@@ -258,6 +258,15 @@ public class StatsCommand implements CommandExecutor, TabCompleter {
             case "healthregen" -> s.setBaseHealthRegen(v);
             case "speed"       -> s.setBaseSpeed(v);
         }
+        // Direkt jetzt neu anwenden:
+        statsManager.applyHealth(p); // Health aus Base + Items
+        statsManager.applySpeed(p);  // Speed live anwenden
+
+        // Mana aus Base + Items neu berechnen
+        double newMaxMana = s.getTotalMana();
+        double newRegen = s.getTotalManaRegen();
+        manaManager.setMax(p, newMaxMana);
+        manaManager.setRegen(p, newRegen);
     }
 
     private void addBase(Player p, String key, double dv){
@@ -275,6 +284,15 @@ public class StatsCommand implements CommandExecutor, TabCompleter {
             case "healthregen" -> s.setBaseHealthRegen(s.getHealthRegen()+dv);
             case "speed" -> s.setBaseSpeed(s.getSpeed()+dv);
         }
+        // Direkt jetzt neu anwenden:
+        statsManager.applyHealth(p); // Health aus Base + Items
+        statsManager.applySpeed(p);  // Speed live anwenden
+
+        // Mana aus Base + Items neu berechnen
+        double newMaxMana = s.getTotalMana();
+        double newRegen = s.getTotalManaRegen();
+        manaManager.setMax(p, newMaxMana);
+        manaManager.setRegen(p, newRegen);
     }
     private void allocate(Player self, String key, int pts){
         PlayerStats s = statsManager.getStats(self);
@@ -291,6 +309,15 @@ public class StatsCommand implements CommandExecutor, TabCompleter {
             case "healthregen" -> s.setBaseHealthRegen(s.getHealthRegen()+pts);
             case "speed" -> s.setBaseSpeed(s.getSpeed()+pts);
         }
+        // Direkt jetzt neu anwenden:
+        statsManager.applyHealth(self); // Health aus Base + Items
+        statsManager.applySpeed(self);  // Speed live anwenden
+
+        // Mana aus Base + Items neu berechnen
+        double newMaxMana = s.getTotalMana();
+        double newRegen = s.getTotalManaRegen();
+        manaManager.setMax(self, newMaxMana);
+        manaManager.setRegen(self, newRegen);
     }
 
     private void show(Player viewer, Player target){

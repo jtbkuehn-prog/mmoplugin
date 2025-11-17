@@ -66,42 +66,84 @@ public class StatsPlugin extends JavaPlugin {
         }
 
         // HUD & Ticks (alle 10 Ticks = 0,5s)
+        // HUD & Ticks (alle 10 Ticks = 0,5s)
         getServer().getScheduler().runTaskTimer(this, () -> {
             for (var p : getServer().getOnlinePlayers()) {
 
-                if (!p.isOnline() || p.isDead())
+                if (!p.isOnline() || p.isDead()) {
                     continue;
-
-                var stats = statsManager.getStats(p);
-                if (stats == null) continue;
-
-                // Mana-Regeneration
-                manaManager.tick(p);
-
-                // Eigene Health-Regeneration
-                double hpr = statsManager.getTotalHealthRegen(p); // /s
-                if (hpr > 0) {
-                    double dt = 0.5; // 10 Ticks
-                    double add = hpr * dt;
-                   stats.heal(add);
                 }
 
-                // Hunger „freezen“
-                p.setFoodLevel(20);
-                p.setSaturation(20f);
+                // Stats & Mana holen
+                PlayerStats stats = statsManager.getStats(p);
+                if (stats == null) continue;
+
+                // --- Mana-Regeneration (deine vorhandene Logik) ---
+                manaManager.tick(p);
+
+                // --- Eigene Health-Regeneration ---
+                double hpr = stats.getHealthRegen(); // HP-Reg pro Sekunde
+                if (hpr > 0) {
+                    double dt = 0.5;          // 10 Ticks = 0,5s
+                    double add = hpr * dt;
+                    stats.heal(add);          // arbeitet auf currentHealth
+                }
+
+                // --- Werte für Anzeige berechnen ---
+                double curHpD  = stats.getCurrentHealth();
+                double maxHpD  = stats.getHealth();          // Max-HP (Base + Items)
+                if (maxHpD <= 0) maxHpD = 1.0;
+                if (curHpD < 0) curHpD = 0;
+
+                double curManaD = manaManager.get(p);
+                double maxManaD = manaManager.getMax(p);
+                if (maxManaD <= 0) maxManaD = 1.0;
+                if (curManaD < 0) curManaD = 0;
+
+                double hpFrac   = curHpD / maxHpD;   // 0..1
+                double manaFrac = curManaD / maxManaD;
+
+                // --- 1) Vanilla-Herzen als HP-Prozent-Balken ---
+                var attr = p.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH);
+                if (attr != null) {
+                    double maxHearts = 20.0;
+                    attr.setBaseValue(maxHearts);
+
+                    double hearts = hpFrac * maxHearts;
+
+                    // Wenn noch lebend, nie komplett 0 Herzen anzeigen,
+                    // sonst denkt Bukkit evtl. der Spieler ist tot.
+                    if (curHpD > 0 && hearts < 1.0) {
+                        hearts = 1.0;
+                    }
+
+                    // clamp
+                    hearts = Math.max(0.0, Math.min(maxHearts, hearts));
+                    p.setHealth(hearts);
+                }
+
+                // --- 2) Hungerleisten als Mana-Prozent-Balken ---
+                int food = (int) Math.round(manaFrac * 20.0);
+                food = Math.max(0, Math.min(20, food));
+
+                p.setFoodLevel(food);
+                p.setSaturation(0f);   // kein Vanilla-Autoplay
                 p.setExhaustion(0f);
 
-                // HUD (ActionBar)
-                int hp = (int) Math.ceil(stats.getCurrentHealth());
-                int hpMax = (int) Math.ceil(stats.getHealth());
-                int m = (int) Math.ceil(manaManager.get(p));
-                int mMax = (int) Math.ceil(manaManager.getMax(p));
+                // --- 3) ActionBar-HUD mit echten Werten + Prozent ---
+                int hp    = (int) Math.ceil(curHpD);
+                int hpMax = (int) Math.ceil(maxHpD);
+                int m     = (int) Math.ceil(curManaD);
+                int mMax  = (int) Math.ceil(maxManaD);
+
+                int hpPct   = (int) Math.round(hpFrac   * 100.0);
+                int manaPct = (int) Math.round(manaFrac * 100.0);
 
                 Component bar = Component.text()
-                        .append(Component.text("❤HP", NamedTextColor.RED))
+                        .append(Component.text("❤HP ", NamedTextColor.RED))
                         .append(Component.text(hp + "/" + hpMax))
                         .append(Component.text("   |   "))
-                        .append(Component.text("✪Mana", NamedTextColor.BLUE))
+                        .append(Component.text("✪Mana ", NamedTextColor.BLUE))
                         .append(Component.text(m + "/" + mMax))
                         .build();
 
@@ -109,15 +151,6 @@ public class StatsPlugin extends JavaPlugin {
             }
         }, 0L, 10L);
 
-        // Online-Spieler initialisieren
-        getServer().getOnlinePlayers().forEach(p -> {
-            PlayerStats stats = statsManager.getStats(p);
-            stats.setCurrentHealth(stats.getHealth()); // volles Custom-HP
-            statsManager.applySpeed(p);                // Speed-Stat
-            p.setFoodLevel(20);
-            p.setSaturation(20f);
-            p.setExhaustion(0f);
-        });
 
 
         // Auto-Save

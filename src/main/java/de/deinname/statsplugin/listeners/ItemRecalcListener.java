@@ -92,15 +92,13 @@ public class ItemRecalcListener implements Listener {
         stats.applyHealth(p);
         stats.applySpeed(p);
 
-        // 4) Mana separat über ManaManager (wie vorher)
-        int lvl = stats.getLevel(p).getLevel();
-        double baseMax   = plugin.getConfig().getDouble("mana.base-max", 50.0)
-                + lvl * plugin.getConfig().getDouble("mana.per-level", 5.0);
-        double baseRegen = plugin.getConfig().getDouble("mana.base-regen", 1.0)
-                + lvl * plugin.getConfig().getDouble("mana.regen-per-level", 0.1);
+        // 4) Mana aus Stats (Base) + Items
+        double baseMax   = ps.getBaseMana();       // <--- Base-Mana aus /stats & Level
+        double baseRegen = ps.getBaseManaRegen();  // <--- Base-ManaRegen
 
         mana.setMax(p,   baseMax   + total.manaMax());
         mana.setRegen(p, baseRegen + total.manaRegen());
+
     }
 
 }
