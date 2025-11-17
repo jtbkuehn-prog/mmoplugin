@@ -1,5 +1,7 @@
 package de.deinname.statsplugin.items;
 
+import de.deinname.statsplugin.abilities.AbilityLore;
+import de.deinname.statsplugin.abilities.AbilityDefinition;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.inventory.ItemFlag;
@@ -47,6 +49,8 @@ public final class ItemStatLore {
 
         meta.lore(lore);
         is.setItemMeta(meta);
+        AbilityLore.appendAbilityLore(is, keys);
+
     }
 
     private static void addLine(List<Component> lore, double v, String fmt) {

@@ -14,7 +14,9 @@ public final class ItemStatKeys {
     public final NamespacedKey RANGE;
     public final NamespacedKey MANA_MAX;
     public final NamespacedKey MANA_REGEN;
-    public final NamespacedKey ABILITY; // z.B. "damage_boost"
+    public final NamespacedKey ABILITY;
+    public final NamespacedKey ABILITY_MANA;
+    public final NamespacedKey ABILITY_COOLDOWN;// z.B. "damage_boost"
     public final NamespacedKey HEALTH_REGEN;
     public final NamespacedKey ATTACKSPEED;
     public final NamespacedKey SPEED;
@@ -29,6 +31,8 @@ public final class ItemStatKeys {
         MANA_MAX = new NamespacedKey(plugin, "mana_max");
         MANA_REGEN = new NamespacedKey(plugin, "mana_regen");
         ABILITY = new NamespacedKey(plugin, "ability");
+        ABILITY_MANA = new NamespacedKey(plugin, "ability_mana");
+        ABILITY_COOLDOWN = new NamespacedKey(plugin, "ability_cooldown");
         HEALTH_REGEN = new NamespacedKey(plugin, "health_regen");
         ATTACKSPEED = new NamespacedKey(plugin, "attackspeed");
         SPEED = new NamespacedKey(plugin, "speed");

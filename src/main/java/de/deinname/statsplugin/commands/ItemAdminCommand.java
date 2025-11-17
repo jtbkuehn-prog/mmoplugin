@@ -1,6 +1,5 @@
 package de.deinname.statsplugin.commands;
 
-import de.deinname.statsplugin.PlayerLevel;
 import de.deinname.statsplugin.StatsManager;
 import de.deinname.statsplugin.items.ItemRarityManager;
 import de.deinname.statsplugin.items.ItemStatKeys;
@@ -22,9 +21,6 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
-import net.kyori.adventure.text.format.TextDecoration;
-import net.kyori.adventure.text.format.TextColor;
-
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -65,6 +61,7 @@ public class ItemAdminCommand implements CommandExecutor, TabCompleter {
             case "rename"      -> handleRename(p, args);
             case "addlore"     -> handleAddLore(p, args);
             case "clearlore"   -> handleClearLore(p);
+            case "setmodel"    -> handleSetModel(p, args);   // ⭐ NEU
             default -> { p.sendMessage("§cUnbekannter Subcommand."); sendHelp(p); yield true; }
         };
 
@@ -75,12 +72,13 @@ public class ItemAdminCommand implements CommandExecutor, TabCompleter {
 
     private void sendHelp(Player p) {
         p.sendMessage("§e/itemadmin setstat <key> <value>");
-        p.sendMessage("§e/itemadmin setability <name|null>");
+        p.sendMessage("§e/itemadmin setability <name|null> [mana] [cooldown]");
         p.sendMessage("§e/itemadmin clear");
         p.sendMessage("§e/itemadmin setrarity <RARITY|#HEX>");
         p.sendMessage("§e/itemadmin rename <name...>");
         p.sendMessage("§e/itemadmin addlore <text...>");
         p.sendMessage("§e/itemadmin clearlore");
+        p.sendMessage("§e/itemadmin setmodel <CustomModelData|null>"); // ⭐ NEU
     }
 
     // ------------ Subcommands ------------
@@ -93,7 +91,6 @@ public class ItemAdminCommand implements CommandExecutor, TabCompleter {
         double value;
         try { value = Double.parseDouble(args[2]); } catch (NumberFormatException e) { p.sendMessage("§cZahl ungültig."); return false; }
 
-        // WICHTIG: über deine Utils schreiben → garantiert kompatibel zum Reader
         switch (key) {
             case "damage"      -> ItemStatUtils.writeStat(hand, keys.DAMAGE, value);
             case "critchance"  -> ItemStatUtils.writeStat(hand, keys.CRIT_CHANCE, value);
@@ -105,7 +102,7 @@ public class ItemAdminCommand implements CommandExecutor, TabCompleter {
             case "manaregen"   -> ItemStatUtils.writeStat(hand, keys.MANA_REGEN, value);
             case "healthregen" -> ItemStatUtils.writeStat(hand, keys.HEALTH_REGEN, value);
             case "attackspeed" -> ItemStatUtils.writeStat(hand, keys.ATTACKSPEED, value);
-            case "speed" -> ItemStatUtils.writeStat(hand, keys.SPEED, value);
+            case "speed"       -> ItemStatUtils.writeStat(hand, keys.SPEED, value);
             default -> { p.sendMessage("§cUnbekannter Stat-Key."); return false; }
         }
 
@@ -125,17 +122,62 @@ public class ItemAdminCommand implements CommandExecutor, TabCompleter {
     }
 
     private boolean handleSetAbility(Player p, String[] args) {
-        if (args.length < 2) { p.sendMessage("§cNutzung: /itemadmin setability <name|null>"); return false; }
-        ItemStack hand = requireHand(p); if (hand == null) return false;
+        // /itemadmin setability <name|null> [mana] [cooldown]
+        if (args.length < 2) {
+            p.sendMessage("§cNutzung: /itemadmin setability <name|null> [mana] [cooldown]");
+            return false;
+        }
 
-        String name = args[1];
-        if ("null".equalsIgnoreCase(name) || "none".equalsIgnoreCase(name)) name = null;
+        ItemStack hand = requireHand(p);
+        if (hand == null) return false;
 
-        // ebenfalls über Utils setzen
-        ItemStatUtils.writeAbility(hand, keys, name);
+        // Ability entfernen
+        if ("null".equalsIgnoreCase(args[1]) || "none".equalsIgnoreCase(args[1])) {
+            ItemMeta meta = hand.getItemMeta();
+            PersistentDataContainer pdc = meta.getPersistentDataContainer();
+            pdc.remove(keys.ABILITY);
+            pdc.remove(keys.ABILITY_MANA);
+            pdc.remove(keys.ABILITY_COOLDOWN);
+            hand.setItemMeta(meta);
+
+            rebuildLorePreservingCustom(hand);
+            p.sendMessage("§aAbility entfernt.");
+            return true;
+        }
+
+        if (args.length < 4) {
+            p.sendMessage("§cNutzung: /itemadmin setability <name> <mana> <cooldownSek>");
+            return false;
+        }
+
+        String abilityId = args[1];
+
+        int manaCost;
+        double cooldown;
+        try {
+            manaCost = Integer.parseInt(args[2]);
+        } catch (NumberFormatException ex) {
+            p.sendMessage("§cMana-Kosten müssen eine ganze Zahl sein.");
+            return false;
+        }
+        try {
+            cooldown = Double.parseDouble(args[3]);
+        } catch (NumberFormatException ex) {
+            p.sendMessage("§cCooldown muss eine Zahl sein (Sekunden, z.B. 3 oder 2.5).");
+            return false;
+        }
+
+        ItemMeta meta = hand.getItemMeta();
+        PersistentDataContainer pdc = meta.getPersistentDataContainer();
+        pdc.set(keys.ABILITY,          PersistentDataType.STRING, abilityId.toLowerCase(Locale.ROOT));
+        pdc.set(keys.ABILITY_MANA,     PersistentDataType.INTEGER, manaCost);
+        pdc.set(keys.ABILITY_COOLDOWN, PersistentDataType.DOUBLE,  cooldown);
+        hand.setItemMeta(meta);
 
         rebuildLorePreservingCustom(hand);
-        p.sendMessage("§aAbility gesetzt: " + (name == null ? "keine" : name));
+
+        p.sendMessage("§aAbility gesetzt: §e" + abilityId
+                + " §7(Mana §b" + manaCost + "§7, CD §a" + cooldown + "s§7)");
         return true;
     }
 
@@ -153,10 +195,16 @@ public class ItemAdminCommand implements CommandExecutor, TabCompleter {
         ItemStatUtils.writeStat(hand, keys.HEALTH_REGEN, 0);
         ItemStatUtils.writeStat(hand, keys.ATTACKSPEED, 0);
         ItemStatUtils.writeStat(hand, keys.SPEED,0);
-        ItemStatUtils.writeAbility(hand, keys, null);
+
+        ItemMeta meta = hand.getItemMeta();
+        PersistentDataContainer pdc = meta.getPersistentDataContainer();
+        pdc.remove(keys.ABILITY);
+        pdc.remove(keys.ABILITY_MANA);
+        pdc.remove(keys.ABILITY_COOLDOWN);
+        hand.setItemMeta(meta);
 
         rebuildLorePreservingCustom(hand);
-        p.sendMessage("§aStats gelöscht (Rarity/Custom-Lore bleibt).");
+        p.sendMessage("§aStats & Ability gelöscht (Rarity/Custom-Lore bleibt).");
         return true;
     }
 
@@ -165,7 +213,7 @@ public class ItemAdminCommand implements CommandExecutor, TabCompleter {
         ItemStack hand = requireHand(p); if (hand == null) return false;
 
         String token = args[1];
-        TextColor color = rarityMgr.get(token);
+        TextColor color = rarityMgr.get(token); // nur Farbe, ModelData bleibt unabhängig
 
         ItemMeta meta = hand.getItemMeta();
         PersistentDataContainer pdc = meta.getPersistentDataContainer();
@@ -236,33 +284,63 @@ public class ItemAdminCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    // ⭐ NEU: CustomModelData setzen
+    private boolean handleSetModel(Player p, String[] args) {
+        if (args.length < 2) {
+            p.sendMessage("§cNutzung: /itemadmin setmodel <CustomModelData|null>");
+            return false;
+        }
+
+        ItemStack hand = requireHand(p);
+        if (hand == null) return false;
+
+        ItemMeta meta = hand.getItemMeta();
+
+        if ("null".equalsIgnoreCase(args[1]) || "none".equalsIgnoreCase(args[1])) {
+            meta.setCustomModelData(null);
+            hand.setItemMeta(meta);
+            p.sendMessage("§aCustomModelData entfernt.");
+            return true;
+        }
+
+        int modelId;
+        try {
+            modelId = Integer.parseInt(args[1]);
+        } catch (NumberFormatException e) {
+            p.sendMessage("§cUngültige Zahl: " + args[1]);
+            return false;
+        }
+
+        meta.setCustomModelData(modelId);
+        hand.setItemMeta(meta);
+
+        p.sendMessage("§aCustomModelData gesetzt: §f" + modelId);
+        return true;
+    }
+
     // ------------ Recalc direkt nach Änderungen ------------
 
     private void recalcNow(Player p) {
         plugin.getServer().getScheduler().runTask(plugin, () -> {
-            // Level-Basis
             int lvl = stats.getLevel(p.getUniqueId()).getLevel();
             double baseMax   = plugin.getConfig().getDouble("mana.base-max", 50.0)
                     + lvl * plugin.getConfig().getDouble("mana.per-level", 5.0);
             double baseRegen = plugin.getConfig().getDouble("mana.base-regen", 1.0)
                     + lvl * plugin.getConfig().getDouble("mana.regen-per-level", 0.1);
 
-            // Item-Boni summieren
             ItemStats total = ItemStats.zero();
             for (ItemStack armor : p.getInventory().getArmorContents()) {
                 total = total.add(ItemStatUtils.read(armor, keys));
             }
             total = total.add(ItemStatUtils.read(p.getInventory().getItemInMainHand(), keys));
 
-            // In Stats übernehmen
             stats.applyItemBonuses(p.getUniqueId(),
                     total.damage(), total.critChance(), total.critDamage(),
                     total.health(), total.armor(), total.range(), total.attackspeed(), total.speed());
 
-            stats.applyHealth(p); // MaxHealth sofort updaten
+            stats.applyHealth(p);
             stats.applySpeed(p);
 
-            // Mana als base + items
             mana.setMax(p,   baseMax   + total.manaMax());
             mana.setRegen(p, baseRegen + total.manaRegen());
         });
@@ -274,46 +352,40 @@ public class ItemAdminCommand implements CommandExecutor, TabCompleter {
         if (is == null || !is.hasItemMeta()) return;
         ItemMeta meta = is.getItemMeta();
 
-        // 1) Vanilla-Attribute verstecken & Modifier entfernen
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
         meta.setAttributeModifiers(null);
 
-        // 2) Stats lesen
         ItemStats s = ItemStatUtils.read(is, keys);
         List<Component> lore = new ArrayList<>();
 
-        // Farb-Config holen
-        TextColor colDamage     = loreColor("damage",     "#FF5555");
-        TextColor colCritChance = loreColor("critchance", "#55FFFF");
-        TextColor colCritDamage = loreColor("critdamage", "#FFD700");
-        TextColor colHealth     = loreColor("health",     "#FF5555");
-        TextColor colArmor      = loreColor("armor",      "#AAAAAA");
-        TextColor colRange      = loreColor("range",      "#55FF55");
-        TextColor colMana       = loreColor("mana",       "#00AAFF");
-        TextColor colManaRegen  = loreColor("manaregen",  "#00AAFF");
-        TextColor colCustom     = loreColor("custom",     "#BFBFBF");
-        TextColor colHealthRegen     = loreColor("healthregen",     "#FF7777");
-        TextColor colAttackspeed     = loreColor("attackspeed",     "#FF7777");
-        TextColor colSpeed     = loreColor("speed",     "#FFFFFF");
+        TextColor colDamage      = loreColor("damage",      "#FF5555");
+        TextColor colCritChance  = loreColor("critchance",  "#55FFFF");
+        TextColor colCritDamage  = loreColor("critdamage",  "#FFD700");
+        TextColor colHealth      = loreColor("health",      "#FF5555");
+        TextColor colArmor       = loreColor("armor",       "#AAAAAA");
+        TextColor colRange       = loreColor("range",       "#55FF55");
+        TextColor colMana        = loreColor("mana",        "#00AAFF");
+        TextColor colManaRegen   = loreColor("manaregen",   "#00AAFF");
+        TextColor colHealthRegen = loreColor("healthregen", "#FF7777");
+        TextColor colAttackspeed = loreColor("attackspeed", "#FF7777");
+        TextColor colSpeed       = loreColor("speed",       "#FFFFFF");
+        TextColor colCustom      = loreColor("custom",      "#BFBFBF");
 
-        // 3) Stat-Zeilen farbig + nicht-kursiv
-        addLineColored(lore, s.damage(),     "+%s Damage",              colDamage);
-        addLineColored(lore, s.critChance(), "+%s%% Crit Chance",       colCritChance);
-        addLineColored(lore, s.critDamage(), "+%s%% Crit Damage",       colCritDamage);
-        addLineColored(lore, s.health(),     "+%s Health",              colHealth);
-        addLineColored(lore, s.armor(),      "+%s Armor",               colArmor);
-        addLineColored(lore, s.range(),      "+%s Range",               colRange);
-        addLineColored(lore, s.manaMax(),    "+%s Mana",                colMana);
-        addLineColored(lore, s.manaRegen(),  "+%s Mana Regeneration/s", colManaRegen);
+        addLineColored(lore, s.damage(),      "+%s Damage",              colDamage);
+        addLineColored(lore, s.critChance(),  "+%s%% Crit Chance",       colCritChance);
+        addLineColored(lore, s.critDamage(),  "+%s%% Crit Damage",       colCritDamage);
+        addLineColored(lore, s.health(),      "+%s Health",              colHealth);
+        addLineColored(lore, s.armor(),       "+%s Armor",               colArmor);
+        addLineColored(lore, s.range(),       "+%s Range",               colRange);
+        addLineColored(lore, s.manaMax(),     "+%s Mana",                colMana);
+        addLineColored(lore, s.manaRegen(),   "+%s Mana Regeneration/s", colManaRegen);
         addLineColored(lore, s.healthRegen(), "+%s Health Regeneration/s", colHealthRegen);
-        addLineColored(lore, s.attackspeed(), "+%s Attackspeed/s", colAttackspeed);
-        addLineColored(lore, s.speed(), "+%s Speed", colSpeed);
+        addLineColored(lore, s.attackspeed(), "+%s Attackspeed/s",       colAttackspeed);
+        addLineColored(lore, s.speed(),       "+%s Speed",               colSpeed);
 
-
-        // 4) Custom-Lore aus PDC (andere Variable! z. B. customLines)
         List<String> customLines = readCustomLore(meta.getPersistentDataContainer());
         if (!customLines.isEmpty()) {
-            lore.add(Component.text("").decoration(TextDecoration.ITALIC, false)); // Separator
+            lore.add(Component.text("").decoration(TextDecoration.ITALIC, false));
             for (String line : customLines) {
                 lore.add(Component.text(line)
                         .color(colCustom)
@@ -321,7 +393,6 @@ public class ItemAdminCommand implements CommandExecutor, TabCompleter {
             }
         }
 
-        // 5) Name ggf. anhand gespeicherter Rarity/HEX einfärben
         TextColor nameColor = resolveStoredColor(meta.getPersistentDataContainer());
         if (nameColor != null) {
             String plainName = meta.hasDisplayName()
@@ -333,27 +404,17 @@ public class ItemAdminCommand implements CommandExecutor, TabCompleter {
 
         meta.lore(lore);
         is.setItemMeta(meta);
+
+        // Ability-Block anhängen (wenn vorhanden)
+        de.deinname.statsplugin.abilities.AbilityLore.appendAbilityLore(is, keys);
     }
-
-
-
 
     private void addLineColored(List<Component> lore, double v, String fmt, TextColor color) {
         if (Math.abs(v) < 1e-9) return;
         String txt = formatNumber(v, fmt);
         lore.add(Component.text(txt)
                 .color(color)
-                .decoration(TextDecoration.ITALIC, false)); // <<< wichtig
-    }
-
-
-    private Component textColored(String s, TextColor color) {
-        return Component.text(s).color(color);
-    }
-
-    private void addLine(List<Component> lore, double v, String fmt) {
-        if (Math.abs(v) < 1e-9) return;
-        lore.add(Component.text(formatNumber(v, fmt), NamedTextColor.GRAY));
+                .decoration(TextDecoration.ITALIC, false));
     }
 
     private String formatNumber(double v, String fmt) {
@@ -362,8 +423,6 @@ public class ItemAdminCommand implements CommandExecutor, TabCompleter {
                 : String.valueOf(Math.round(v * 10) / 10.0);
         return String.format(fmt, num);
     }
-
-    // ------------ PDC & Utils ------------
 
     private ItemStack requireHand(Player p) {
         ItemStack hand = p.getInventory().getItemInMainHand();
@@ -379,13 +438,6 @@ public class ItemAdminCommand implements CommandExecutor, TabCompleter {
         if (raw == null || raw.isEmpty()) return new ArrayList<>();
         return new ArrayList<>(Arrays.asList(raw.split("\n", -1)));
     }
-
-    private void addCustomLine(List<Component> lore, String line, TextColor color) {
-        lore.add(Component.text(line)
-                .color(color)
-                .decoration(TextDecoration.ITALIC, false)); // <<< wichtig
-    }
-
 
     private void writeCustomLore(PersistentDataContainer pdc, List<String> lines) {
         String raw = String.join("\n", lines);
@@ -404,7 +456,7 @@ public class ItemAdminCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
         if (!(sender instanceof Player)) return List.of();
         if (args.length == 1) {
-            return Arrays.asList("setstat","setability","clear","setrarity","rename","addlore","clearlore");
+            return Arrays.asList("setstat","setability","clear","setrarity","rename","addlore","clearlore","setmodel");
         }
         if (args.length == 2 && "setstat".equalsIgnoreCase(args[0])) {
             return Arrays.asList("damage","critchance","critdamage","health","armor","range","mana","manaregen","healthregen","attackspeed","speed");
@@ -413,9 +465,8 @@ public class ItemAdminCommand implements CommandExecutor, TabCompleter {
             return rarityMgr.names().stream().map(String::toLowerCase).collect(Collectors.toList());
         }
         if (args.length == 2 && "setability".equalsIgnoreCase(args[0])) {
-            return Arrays.asList("damage_boost"); // ergänzbar
+            return Arrays.asList("damage_boost"); // erweiterbar
         }
         return List.of();
     }
-
 }
