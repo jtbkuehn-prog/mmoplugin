@@ -19,7 +19,7 @@ public class DamageNumbers {
     public void show(World world, Location base, double amount, boolean crit) {
         if (world == null || base == null) return;
 
-        Location loc = base.clone().add(0, 1.2, 0);
+        Location loc = base.clone().add(0, 0, 0);
         TextDisplay td = world.spawn(loc, TextDisplay.class, d -> {
             String text = crit ? "✦ " + String.format("%.1f", amount) : String.format("%.1f", amount);
             d.text(Component.text(text).color(crit ? NamedTextColor.GOLD : NamedTextColor.RED));

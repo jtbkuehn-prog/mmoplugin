@@ -154,6 +154,30 @@ public class PlayerStats {
 
 
 
+    public void setItemDamage(double v) { this.itemDamage = v; }
+
+    public void setItemCritChance(double v) { this.itemCritChance = v; }
+
+    public void setItemCritDamage(double v) { this.itemCritDamage = v; }
+
+    public void setItemAttackSpeed(double v) { this.itemAttackSpeed = v; }
+
+    public void setItemRange(double v) { this.itemRange = v; }
+
+    public void setItemHealth(double v) { this.itemHealth = v; }
+
+    public void setItemArmor(double v) { this.itemArmor = v; }
+
+    public void setItemMana(double v) { this.itemMana = v; }
+
+    public void setItemManaRegen(double v) { this.itemManaRegen = v; }
+
+    public void setItemHealthRegen(double v) { this.itemHealthRegen = v; }
+
+    public void setItemSpeed(double v) { this.itemSpeed = v; }
+
+
+
     public double getCurrentHealth() {
         // Fallback, falls noch nie gesetzt:
         if (currentHealth <= 0) {

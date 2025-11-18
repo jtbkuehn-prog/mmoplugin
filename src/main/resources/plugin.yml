@@ -17,12 +17,18 @@ commands:
       /stats save [spieler] - Admin
     permission: stats.use
     permission-message: Du hast keine Berechtigung!
+
   itemadmin:
     description: Editiere Item-Stats/NBT und Fähigkeiten
     usage:
       /itemadmin <setstat|setability|clear>
     permission: stats.admin
 
+  mobspawn:
+    description: Spawnt einen Custom-MMO-Mob
+    usage: /mobspawn <type> <level>
+    permission: stats.admin
+    permission-message: §cKeine Rechte.
 
 permissions:
   stats.use:

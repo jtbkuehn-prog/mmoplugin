@@ -2,8 +2,11 @@ package de.deinname.statsplugin.listeners;
 
 import de.deinname.statsplugin.PlayerLevel;
 import de.deinname.statsplugin.StatsManager;
+import de.deinname.statsplugin.mobs.CustomMobManager;
+import de.deinname.statsplugin.mobs.CustomMobType;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextColor;
+import org.bukkit.Bukkit;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
@@ -17,10 +20,12 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 /**
  * Vergibt konfigurierbare XP beim Kill und deaktiviert Vanilla-EXP komplett.
+ *
  * Priorität:
- *  1) exakter Eintrag in xp.mobs (z.B. WITCH)
- *  2) Gruppen-Fallback (HOSTILE / PASSIVE / NEUTRAL), wenn vorhanden
- *  3) xp.mobs.default
+ *  1) Custom-Mob mit PDC (mmomob_id/level/xp) → XP aus CustomMobManager + hartes remove()
+ *  2) exakter Eintrag in xp.mobs (z.B. WITCH)
+ *  3) Gruppen-Fallback (HOSTILE / PASSIVE / NEUTRAL), wenn vorhanden
+ *  4) xp.mobs.default
  *
  * Anzeige im Chat ist konfigurierbar (xp.announce.chat).
  */
@@ -28,10 +33,12 @@ public class XPListener implements Listener {
 
     private final JavaPlugin plugin;
     private final StatsManager stats;
+    private final CustomMobManager mobManager;
 
-    public XPListener(JavaPlugin plugin, StatsManager stats) {
+    public XPListener(JavaPlugin plugin, StatsManager stats, CustomMobManager mobManager) {
         this.plugin = plugin;
         this.stats = stats;
+        this.mobManager = mobManager;
     }
 
     // 1) Vanilla-EXP (grüne Orbs / Player-Level) komplett ausschalten
@@ -52,23 +59,60 @@ public class XPListener implements Listener {
         Player killer = dead.getKiller();
         if (killer == null) return; // wir vergeben hier nur bei "echtem" Killer
 
-        int xp = resolveXp(dead.getType());
+        int xp = resolveXp(dead);
         if (xp <= 0) return;
 
         // Deine Level-Logik
-        PlayerLevel lvl = stats.getLevel(killer); // getLevel(Player)
-        // NOTE: falls deine Methode anders heißt, hier anpassen (z.B. addXp(double))
+        PlayerLevel lvl = stats.getLevel(killer);
         lvl.addXP(xp);
 
         // Chat-Toast optional
         if (plugin.getConfig().getBoolean("xp.announce.chat", true)) {
+            String hex = plugin.getConfig().getString("xp.announce.color", "#FFD166");
             killer.sendMessage(Component.text("+" + xp + " XP")
-                    .color(TextColor.fromHexString(plugin.getConfig().getString("xp.announce.color", "#FFD166"))));
+                    .color(TextColor.fromHexString(hex)));
         }
+
+        // Wenn es ein Custom-Mob ist → sicher und sauber sterben lassen
+        if (mobManager != null) {
+            CustomMobType t = mobManager.getType(dead);
+            if (t != null) {
+                // Health auf 0 setzen (triggert Death-Animation)
+                dead.setHealth(0.0);
+
+                // Mob für den Rest der Phase komplett deaktivieren:
+                dead.setAI(false);
+                dead.setInvulnerable(true);
+                dead.setSilent(true);
+
+                // Verzögert entfernen (nach 1.5 Sekunden)
+                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (!dead.isDead()) {
+                        dead.remove();
+                    }
+                }, 30L);
+            }
+        }
+
     }
 
-    // ---- Helper: exakter Wert > Gruppe > default ----
-    private int resolveXp(EntityType type) {
+    // ---- XP-Bestimmung: CustomMob > Config-Mapping ----
+
+    private int resolveXp(LivingEntity entity) {
+        // 1) Custom-Mob? → nimm seine eigene XP
+        if (mobManager != null) {
+            CustomMobType t = mobManager.getType(entity);
+            if (t != null) {
+                int xp = mobManager.getXp(entity);
+                if (xp > 0) return xp;
+            }
+        }
+
+        // 2) normales Vanilla-Mob → alte Logik nach EntityType
+        return resolveXpByType(entity.getType());
+    }
+
+    private int resolveXpByType(EntityType type) {
         ConfigurationSection sec = plugin.getConfig().getConfigurationSection("xp.mobs");
         if (sec == null) return plugin.getConfig().getInt("xp.mobs.default", 0);
 

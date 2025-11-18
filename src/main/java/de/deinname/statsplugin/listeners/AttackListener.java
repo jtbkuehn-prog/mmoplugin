@@ -80,8 +80,8 @@ public class AttackListener implements Listener {
         CustomReach.allowOnce(p.getUniqueId(), target);
 
         // Kleines Feedback (optional)
-        p.getWorld().spawnParticle(Particle.SWEEP_ATTACK, p.getLocation().add(0, 1.0, 0), 1, 0.1, 0.1, 0.1, 0.0);
-        p.playSound(p.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 0.3f, 1.1f);
+        //p.getWorld().spawnParticle(Particle.SWEEP_ATTACK, p.getLocation().add(0, 1.0, 0), 1, 0.1, 0.1, 0.1, 0.0);
+       // p.playSound(p.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 0.3f, 1.1f);
 
         // WICHTIG: Wir lösen KEINEN Schaden hier aus.
         // Der eigentliche Schaden passiert zentral in DamageListener

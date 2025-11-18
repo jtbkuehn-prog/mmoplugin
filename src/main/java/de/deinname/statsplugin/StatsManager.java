@@ -185,47 +185,29 @@ public class StatsManager {
         }
     }
 
-    public void applyItemBonuses(java.util.UUID id, double damage, double critC, double critD, double health, double armor, double range, double attackspeed, double speed){
+    public void applyItemBonuses(java.util.UUID id,
+                                 double damage,
+                                 double critC,
+                                 double critD,
+                                 double health,
+                                 double armor,
+                                 double range,
+                                 double attackspeed,
+                                 double speed) {
+
         PlayerStats s = playerStats.get(id);
         if (s == null) return;
-        ItemBonus prev = lastItemBonus.getOrDefault(id, new ItemBonus(0,0,0,0,0,0,0, 0));
-        double dDamage = damage - prev.d;
-        double dCritC = critC - prev.cc;
-        double dCritD = critD - prev.cd;
-        double dHealth = health - prev.hp;
-        double dArmor = armor - prev.ar;
-        double dRange = range - prev.rg;
-        double dAttackspeed = attackspeed - prev.as;
-        double dSpeed = speed - prev.sp;
 
-
-        if (dDamage != 0)
-            s.setBaseDamage(s.getBaseDamage() + dDamage);
-
-        if (dCritC != 0)
-            s.setBaseCritChance(s.getBaseCritChance() + dCritC);
-
-        if (dCritD != 0)
-            s.setBaseCritDamage(s.getBaseCritDamage() + dCritD);
-
-        if (dArmor != 0)
-            s.setBaseArmor(s.getBaseArmor() + dArmor);
-
-        if (dRange != 0)
-            s.setBaseRange(s.getBaseRange() + dRange);
-
-        if (dHealth != 0)
-            s.setBaseHealth(s.getBaseHealth() + dHealth);
-
-        if (dAttackspeed != 0)
-            s.setBaseAttackSpeed(s.getBaseAttackSpeed() + dAttackspeed);
-
-        if (dSpeed != 0)
-            s.setBaseSpeed(s.getBaseSpeed() + dSpeed);
-
-
-
-        lastItemBonus.put(id, new ItemBonus(damage, critC, critD, health, armor, range, attackspeed, speed));
+        // Hier KEIN + und KEIN setBase mehr:
+        s.setItemDamage(damage);
+        s.setItemCritChance(critC);
+        s.setItemCritDamage(critD);
+        s.setItemHealth(health);
+        s.setItemArmor(armor);
+        s.setItemRange(range);
+        s.setItemAttackSpeed(attackspeed);
+        s.setItemSpeed(speed);
     }
+
 
 }

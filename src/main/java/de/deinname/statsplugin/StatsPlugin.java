@@ -14,6 +14,10 @@ import de.deinname.statsplugin.items.ItemStatKeys;
 import de.deinname.statsplugin.mana.ManaManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import de.deinname.statsplugin.mobs.CustomMobManager;
+import de.deinname.statsplugin.commands.MobSpawnCommand;
+
+
 
 public class StatsPlugin extends JavaPlugin {
     private StatsManager statsManager;
@@ -28,6 +32,7 @@ public class StatsPlugin extends JavaPlugin {
         statsManager = new StatsManager();
         statsManager.setStorage(storage);
         damageNumbers = new DamageNumbers(this);
+        CustomMobManager mobManager = new CustomMobManager(this);
 
         ItemStatKeys itemKeys = new ItemStatKeys(this);
         ManaManager manaManager = new ManaManager(this);
@@ -43,9 +48,9 @@ public class StatsPlugin extends JavaPlugin {
 
         // Listener
         getServer().getPluginManager().registerEvents(new PlayerListener(statsManager), this);
-        getServer().getPluginManager().registerEvents(new DamageListener(statsManager, damageNumbers), this);
+        getServer().getPluginManager().registerEvents(new DamageListener(statsManager, damageNumbers, mobManager), this);
         getServer().getPluginManager().registerEvents(new AttackListener(statsManager, damageNumbers), this);
-        getServer().getPluginManager().registerEvents(new XPListener(this, statsManager), this);
+        getServer().getPluginManager().registerEvents(new XPListener(this, statsManager, mobManager), this);
         getServer().getPluginManager().registerEvents(new ItemRecalcListener(this, statsManager, manaManager, itemKeys), this);
         getServer().getPluginManager().registerEvents(new AbilityListener(this, manaManager, itemKeys), this);
         getServer().getPluginManager().registerEvents(new DamageBoostState(), this);
@@ -64,6 +69,13 @@ public class StatsPlugin extends JavaPlugin {
             getCommand("itemadmin").setExecutor(itemCmd);
             getCommand("itemadmin").setTabCompleter(itemCmd);
         }
+
+
+
+        MobSpawnCommand mobCmd = new MobSpawnCommand(mobManager);
+        getCommand("mobspawn").setExecutor(mobCmd);
+        getCommand("mobspawn").setTabCompleter(mobCmd);
+
 
         // HUD & Ticks (alle 10 Ticks = 0,5s)
         // HUD & Ticks (alle 10 Ticks = 0,5s)
