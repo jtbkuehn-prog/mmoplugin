@@ -47,7 +47,7 @@ public class PlayerStats {
     private double baseCritChance  = 5.0;
     private double baseCritDamage  = 150.0;
     private double baseAttackSpeed = 1.0;
-    private double baseRange       = 3.0;
+    private double baseRange       = 4.5;
     private double baseHealth      = 20.0;
     private double baseArmor       = 0.0;
     private double baseMana        = 50.0;

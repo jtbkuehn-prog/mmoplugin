@@ -29,6 +29,7 @@ public class PlayerListener implements Listener {
         // Health anwenden
         statsManager.applyHealth(event.getPlayer());
         statsManager.applySpeed(event.getPlayer());
+        statsManager.applyNoVanillaCooldown(event.getPlayer());
 
         event.getPlayer().sendMessage("§aStats-System geladen!");
     }

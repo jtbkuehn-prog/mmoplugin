@@ -5,15 +5,15 @@ import de.deinname.statsplugin.items.ItemStatKeys;
 import de.deinname.statsplugin.items.ItemStatUtils;
 import de.deinname.statsplugin.items.ItemStats;
 import de.deinname.statsplugin.mana.ManaManager;
+import io.papermc.paper.event.player.PlayerPickItemEvent;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.player.PlayerItemHeldEvent;
-import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerSwapHandItemsEvent;
+import org.bukkit.event.player.*;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -40,6 +40,18 @@ public class ItemRecalcListener implements Listener {
     @EventHandler
     public void onHeld(PlayerItemHeldEvent e){
         // WICHTIG: erst einen Tick später ist der Mainhand-Slot wirklich umgeschaltet
+        Player p = e.getPlayer();
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> recalc(p), 1L);
+    }
+
+    @EventHandler
+    public void onPickup(EntityPickupItemEvent e){
+        if (!(e.getEntity() instanceof Player p)) return;
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> recalc(p), 1L);
+    }
+
+    @EventHandler
+    public void onDrop(PlayerDropItemEvent e){
         Player p = e.getPlayer();
         plugin.getServer().getScheduler().runTaskLater(plugin, () -> recalc(p), 1L);
     }

@@ -11,7 +11,7 @@ public enum CustomMobType {
             EntityType.ZOMBIE,
             40.0,   // HP bei Level 1
             6.0,    // Damage bei Level 1
-            2.0,    // Armor
+            200.0,    // Armor
             0.24,   // MovementSpeed
             10      // XP bei Level 1
     ),
@@ -25,7 +25,19 @@ public enum CustomMobType {
             0.0,
             0.27,
             12
+    ),
+
+    SKELETON_PRINCE(
+        "skeleton_prince",
+        ChatColor.GOLD + "" + ChatColor.BOLD + "Richard, the Skeleton Prince",
+        EntityType.SKELETON,
+        25000.0, // sehr viel HP
+                50.0,    // Grundschaden
+                0.0,    // Armor
+                0.30,    // etwas schneller
+                500      // viel XP
     );
+
 
     private final String id;
     private final String displayName;

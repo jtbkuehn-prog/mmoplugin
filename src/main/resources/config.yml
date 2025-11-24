@@ -59,17 +59,18 @@ rarities:
 
 lore_colors:
   damage:      "#FF5555"
-  critchance:  "#55FFFF"
-  critdamage:  "#FFD700"
+  critchance:  "#FFFF55"
+  critdamage:  "#FFAA00"
   health:      "#FF5555"
   armor:       "#AAAAAA"
-  range:       "#55FF55"
-  mana:        "#00AAFF"
-  manaregen:   "#00AAFF"
+  range:       "#00AAAA"
+  mana:        "#55FFFF"
+  manaregen:   "#55FFFF"
   custom:      "#BFBFBF"
-  healthregen: "#FF7777"
-  attackspeed: "#FF7777"
-  speed: "FFFFFF"
+  healthregen: "#FF5555"
+  attackspeed: "#FF55FF"
+  speed: "#FFFFFF"
+  Blau: "#5555FF"
 
 stats_display:
   order:
@@ -79,23 +80,23 @@ stats_display:
     - attackspeed
     - range
     - health
+    - healthregen
     - armor
     - mana
     - manaregen
-    - healthregen
     - speed
 
   colors:
     damage:      "#FF5555"
-    critchance:  "#55FFFF"
-    critdamage:  "#FFD166"
-    attackspeed: "#FFD166"
-    range:       "#55FF55"
-    health:      "#FF4444"
+    critchance:  "#FFFF55"
+    critdamage:  "#FFAA00"
+    attackspeed: "#FF55FF"
+    range:       "#00AAAA"
+    health:      "#FF5555"
     armor:       "#AAAAAA"
-    mana:        "#55AAFF"
-    manaregen:   "#55AAFF"
-    healthregen: "#FF77AA"
+    mana:        "#55FFFF"
+    manaregen:   "#55FFFF"
+    healthregen: "#FF5555"
     speed:       "#FFFFFF"
 
   labels:
@@ -104,7 +105,7 @@ stats_display:
     critchance: "Crit Chance"
     critdamage: "Crit Damage"
     attackspeed: "Attack Speed"
-    range: "Range"
+    range: "Reach"
     health: "Health"
     armor: "Armor"
     mana: "Mana"
@@ -120,3 +121,81 @@ combat:
   knockback:
     base: 0.40
     y: 0.35
+
+
+loot:
+  tables:
+    dungeon_basic:
+      rolls: 3
+      entries:
+        - template: ayri_ingot
+          min: 2
+          max: 3
+          weight: 47
+        - template: ayri_powder
+          min: 2
+          max: 3
+          weight: 47
+        - template: ayri_key
+          min: 1
+          max: 1
+          weight: 5
+        - template: ayri_axe
+          min: 1
+          max: 1
+          weight: 1
+
+
+
+    zombie_easy:
+      rolls: 1           # wie oft gelootet wird (2x aus der Tabelle ziehen)
+      entries:
+        - template: starter_sword   # Name aus /itemtpl save
+          weight: 5                 # Gewicht (je höher, desto wahrscheinlicher)
+          min: 1                    # min. Anzahl
+          max: 1                    # max. Anzahl
+        - template: basic_potion
+          weight: 20
+          min: 1
+          max: 3
+        - template: coins_small
+          weight: 40
+          min: 5
+          max: 15
+
+    zombie_warrior:
+      rolls: 2
+      entries:
+        - template: ayri1
+          weight: 10
+          min: 1
+          max: 1
+        - template: ayri2
+          weight: 30
+          min: 10
+          max: 25
+
+    skeleton_archer:
+      rolls: 3
+      entries:
+        - template: warrior_sword_t2
+          weight: 10
+          min: 1
+          max: 1
+        - template: warrior_armor_t2
+          weight: 5
+          min: 1
+          max: 1
+        - template: coins_big
+          weight: 40
+          min: 20
+          max: 50
+
+  mobs:
+    ZOMBIE: zombie_easy
+    HUSK: zombie_easy
+    DROWNED: zombie_easy
+
+  custom_mobs:
+    zombie_warrior: zombie_warrior
+    skeleton_archer: skeleton_archer

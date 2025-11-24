@@ -7,16 +7,22 @@ import de.deinname.statsplugin.combat.CustomReach;
 import de.deinname.statsplugin.mobs.CustomMobManager;
 import de.deinname.statsplugin.mobs.CustomMobType;
 import de.deinname.statsplugin.util.DamageNumbers;
+import org.bukkit.Material;
 import org.bukkit.Particle;
-import org.bukkit.entity.Entity;
-import org.bukkit.entity.LivingEntity;
-import org.bukkit.entity.Player;
-import org.bukkit.entity.Projectile;
+import org.bukkit.command.PluginCommandYamlParser;
+import org.bukkit.entity.*;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.NamespacedKey;
+import org.bukkit.persistence.PersistentDataContainer;
+import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.plugin.java.JavaPlugin;
+
 
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
@@ -28,22 +34,25 @@ public class DamageListener implements Listener {
     private final StatsManager statsManager;
     private final DamageNumbers numbers;
     private final CustomMobManager customMobManager;
-
+    private final Map<UUID, UUID> lastHit = new HashMap<>();
 
     // eigener Cooldown pro Spieler (Zeit in Nanosekunden)
     private final Map<UUID, Long> lastAttackTimeNs = new HashMap<>();
+    private final NamespacedKey KEY_BOW_FORCE;
 
     public DamageListener(StatsManager statsManager,
                           DamageNumbers numbers,
-                          CustomMobManager customMobManager) {
+                          CustomMobManager customMobManager, JavaPlugin plugin) {
         this.statsManager = statsManager;
         this.numbers = numbers;
         this.customMobManager = customMobManager;
+        this.KEY_BOW_FORCE = new NamespacedKey(plugin, "bow_force");
     }
 
     /**
      * Zentrale Schadenslogik für Entity-zu-Entity-Schaden:
-     * - Wenn Damager Spieler: benutze Stats, Crit, DamageBoost, Range, Attack-Speed.
+     * - Wenn Damager Spieler (Melee) oder Projektil von Spieler:
+     *      → benutze Stats, Crit, DamageBoost, (Attack-Speed nur für Melee), Range nur für Melee.
      * - Wenn Damager Mob/Projectile: benutze bei Custom-Mobs deren damageAt(level),
      *   sonst Vanilla-FinalDamage.
      * - Wenn Ziel Spieler: wende Schaden auf Custom-HP an (currentHealth).
@@ -53,40 +62,98 @@ public class DamageListener implements Listener {
     public void onDamage(EntityDamageByEntityEvent e) {
         Entity damager = e.getDamager();
         Entity entity = e.getEntity();
+        if (entity instanceof Player && damager instanceof Player) {
+            e.setCancelled(true);
+            return;}
 
         if (!(entity instanceof LivingEntity victim)) {
             return;
         }
 
-        double damage;
-        boolean crit = false;
+        // Wenn Damager Spieler ist und Mage-Waffe in der Hand hat → Melee ignorieren,
+// denn der Schaden kommt vom Beam im AttackListener.
+        Player attacker = null;
+        boolean isProjectileAttack = false;
 
-        // --- 1) Wenn Damager ein Spieler ist -> eigene Stats, Range, Crit, DamageBoost, Attack-Speed ---
-        if (damager instanceof Player attacker) {
-            PlayerStats atk = statsManager.getStats(attacker);
-            if (atk == null) return;
+        if (damager instanceof Player p) {
+            attacker = p;
+        } else if (damager instanceof Projectile proj && proj.getShooter() instanceof Player p) {
+            attacker = p;
+            isProjectileAttack = true;
+        }
 
-            // Attack-Speed-Cooldown prüfen
-            if (!canAttackNow(attacker, atk)) {
-                // noch im Cooldown → Hit komplett ignorieren
+// Melee mit Mage-Waffe komplett canceln
+        if (attacker != null && !isProjectileAttack) {
+            ItemStack hand = attacker.getInventory().getItemInMainHand();
+            if (isMageWeapon(hand)) {
                 e.setCancelled(true);
                 return;
             }
+        }
 
-            // Extended-Reach-Override?
-            boolean allowExtended = CustomReach.consumeIfMatches(attacker.getUniqueId(), victim);
 
-            // Range-Check (nur wenn kein Override)
-            if (!allowExtended) {
-                double dist = attacker.getEyeLocation().distance(
-                        victim.getLocation().add(0, victim.getHeight() * 0.5, 0)
-                );
-                if (dist > atk.getRange()) {
+        if (attacker != null && !isProjectileAttack) {
+            ItemStack hand = attacker.getInventory().getItemInMainHand();
+            if (isBowWeapon(hand)) {
+                e.setCancelled(true);
+                return;
+            }
+        }
+
+
+        // Explosive-Arrow-Pfeile NICHT nochmal normal verarbeiten
+        if (damager instanceof Projectile proj &&
+                proj.getScoreboardTags().contains("ability_explosive_arrow")) {
+            e.setCancelled(true);
+            return;
+        }
+
+
+        // Herausfinden, ob es ein Spieler-Angriff ist (Melee oder Projektil)
+        attacker = null;
+        isProjectileAttack = false;
+
+        if (damager instanceof Player p) {
+
+            attacker = p;
+        } else if (damager instanceof Projectile proj && proj.getShooter() instanceof Player p) {
+            attacker = p;
+            isProjectileAttack = true;
+        }
+
+        double damage;
+        boolean crit = false;
+
+
+        // --- 1) Spieler-Angriff (Melee oder Projektil) ---
+        if (attacker != null) {
+            lastHit.put(victim.getUniqueId(), attacker.getUniqueId());
+            PlayerStats atk = statsManager.getStats(attacker);
+            if (atk == null) return;
+
+            // Attack-Speed-Cooldown NUR für Melee
+            if (!isProjectileAttack) {
+                if (!canAttackNow(attacker, atk)) {
                     e.setCancelled(true);
-                    attacker.sendActionBar(net.kyori.adventure.text.Component.text(
-                            "Zu weit: " + String.format("%.1f", dist) + " / " + String.format("%.1f", atk.getRange())
-                    ));
                     return;
+                }
+            }
+
+            // Extended-Reach/Range NUR für Melee
+            if (!isProjectileAttack) {
+                boolean allowExtended = CustomReach.consumeIfMatches(attacker.getUniqueId(), victim);
+
+                if (!allowExtended) {
+                    double dist = attacker.getEyeLocation().distance(
+                            victim.getLocation().add(0, victim.getHeight() * 0.5, 0)
+                    );
+                    if (dist > atk.getRange()) {
+                        e.setCancelled(true);
+                        attacker.sendActionBar(net.kyori.adventure.text.Component.text(
+                                "Zu weit: " + String.format("%.1f", dist) + " / " + String.format("%.1f", atk.getRange())
+                        ));
+                        return;
+                    }
                 }
             }
 
@@ -103,13 +170,33 @@ public class DamageListener implements Listener {
                 damage *= DamageBoostState.getMultiplier(aid);
             }
 
+            // ---- Bogen-Schaden nach Aufladung skalieren ----
+            if (isProjectileAttack && e.getDamager() instanceof Arrow arrow) {
+                PersistentDataContainer pdc = arrow.getPersistentDataContainer();
+                Float forceObj = pdc.get(KEY_BOW_FORCE, PersistentDataType.FLOAT);
+
+                if (forceObj != null) {
+                    double force = forceObj; // 0.0–1.0
+
+                    // Nur bei voll aufgeladenem Schuss 100% Schaden,
+                    // sonst linear weniger:
+                    // force = 1.0 → 100%
+                    // force = 0.5 → 50% usw.
+                    damage *= force;
+
+                    // Optional: minimaler Schaden, falls du kein 0-Damage willst:
+                    // double scaled = 0.2 + 0.8 * force; // 20–100%
+                    // damage *= scaled;
+                }
+            }
+
+
         } else {
-            // --- 2) Damager ist KEIN Spieler (Zombie, Skeleton, Projektil, etc.) ---
+            // --- 2) Damager ist KEIN Spieler (Zombie, Skeleton, Custom-Mob, etc.) ---
             damage = computeMobDamage(e);
         }
 
         // --- 3) Schaden anwenden je nach Ziel-Typ ---
-
         if (victim instanceof Player def) {
             // Custom-HP für Spieler
             PlayerStats defStats = statsManager.getStats(def);
@@ -122,6 +209,11 @@ public class DamageListener implements Listener {
             if (curHp <= 0 || curHp > maxHp) {
                 curHp = maxHp;
             }
+
+            double armor = defStats.getArmor();
+            double finalDmg = applyArmor(damage, armor);
+            damage = finalDmg;
+
 
             double newHp = curHp - damage;
 
@@ -137,14 +229,51 @@ public class DamageListener implements Listener {
                 e.setDamage(0.0); // KEIN Vanilla-Schaden mehr auf Herzen
             }
 
-        } else {
-            // --- 4) Mobs / andere LivingEntities: Custom-Schaden direkt anwenden ---
-            double before = victim.getHealth();
-            double after = Math.max(0.0, before - damage);
+            } else {
+                if (customMobManager != null
+                    && victim instanceof LivingEntity le
+                    && customMobManager.getType(le) != null) {
 
-            e.setDamage(0.0); // Vanilla-Schaden verhindern
-            victim.setHealth(after);
-        }
+                    // ---- Custom-Mob-HP/Damage-System ----
+                    double maxHp = customMobManager.getMaxHp(le);
+                    if (maxHp <= 0) maxHp = 1.0;
+
+                    double curHp = customMobManager.getCurrentHp(le);
+                    if (curHp <= 0 || curHp > maxHp) {
+                        curHp = maxHp;
+                    }
+
+                    // Armor anwenden (einfaches Beispiel)
+                    double armor = customMobManager.getArmor(le);
+                    double finalDmg = applyArmor(damage, armor);
+                    damage = finalDmg;
+
+                    double newHp = curHp - finalDmg;
+
+                    if (newHp <= 0) {
+                       customMobManager.setCurrentHp(le, 0.0);
+
+                        // Vanilla-Tod auslösen, damit XP/Loot-Listener sauber greifen
+                        e.setDamage(1000.0);
+                    } else {
+                       customMobManager.setCurrentHp(le, newHp);
+                       e.setDamage(0.0); // keine Vanilla-HP runter
+
+                        // kleine Hurt-Animation
+                     le.playHurtAnimation(1.0f);
+                    }
+                        customMobManager.updateHpName(le);
+                } else {
+                    // ---- normale Vanilla-Mobs wie bisher ----
+                    double before = victim.getHealth();
+                    double after = Math.max(0.0, before - damage);
+
+                    e.setDamage(0.0);
+                    victim.setHealth(after);
+                }
+            }
+
+
 
         // --- 5) Feedback: Damage-Number & Crit-Partikel ---
         var rand = ThreadLocalRandom.current();
@@ -163,14 +292,12 @@ public class DamageListener implements Listener {
                     25, 0.4, 0.4, 0.4, 0.05
             );
         }
-
     }
 
     private boolean rollCrit(double critChancePercent) {
         if (critChancePercent <= 0) return false;
         return ThreadLocalRandom.current().nextDouble(0.0, 100.0) < critChancePercent;
     }
-
 
     /**
      * Attack-Speed-Logik:
@@ -181,7 +308,7 @@ public class DamageListener implements Listener {
     private boolean canAttackNow(Player p, PlayerStats atk) {
         double aps = atk.getAttackSpeed(); // Angriffe pro Sekunde
 
-        // Sicherheits-Clamp: niemals kleiner als 0.1 APS und niemals größer als z.B. 20 APS
+        // Sicherheits-Clamp
         if (aps < 0.1) aps = 0.1;     // max 10 Sekunden Cooldown
         if (aps > 20.0) aps = 20.0;   // min 0.05s (1 Tick) Cooldown
 
@@ -195,21 +322,13 @@ public class DamageListener implements Listener {
         if (last != null) {
             long diff = now - last;
             if (diff < cooldownNs) {
-                // DEBUG optional:
-                // p.sendMessage("§cCD " + (diff/1_000_000) + "ms / " + (cooldownNs/1_000_000) + "ms");
                 return false;
             }
         }
 
-        // Hit ist erlaubt → Zeit aktualisieren
         lastAttackTimeNs.put(id, now);
-
-        // DEBUG optional:
-        // p.sendMessage("§aHit OK. APS=" + aps + " CD=" + (cooldownNs/1_000_000) + "ms");
-
         return true;
     }
-
 
     /**
      * Bestimmt den Schaden eines NICHT-Spieler-Damagers.
@@ -288,7 +407,6 @@ public class DamageListener implements Listener {
 
         switch (e.getCause()) {
             case LAVA, FIRE, FIRE_TICK -> {
-                // Lava/Feuer: eher DoT, aber nicht instant Kill
                 scale = 0.25;          // 1/4 des Vanilla-Schadens
                 maxFraction = 0.10;   // pro Tick max 10% MaxHP
             }
@@ -320,7 +438,9 @@ public class DamageListener implements Listener {
             e.setDamage(0.0);
             return;
         }
-
+        double playerArmor = ps.getArmor();
+        double SipDamage = applyArmor(dmg, playerArmor);
+        dmg = SipDamage;
         double newHp = curHp - dmg;
 
         if (newHp <= 0) {
@@ -335,4 +455,31 @@ public class DamageListener implements Listener {
             e.setDamage(0.0); // keine Vanilla-Herzen verlieren
         }
     }
+
+    private static final int MAGE_MODEL_ID = 2001;
+
+    private boolean isMageWeapon(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) return false;
+        ItemMeta meta = item.getItemMeta();
+        return meta.hasCustomModelData() && meta.getCustomModelData() == MAGE_MODEL_ID;
+    }
+
+    private static final int BOW_MODEL_ID = 3001;
+
+    private boolean isBowWeapon(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) return false;
+        ItemMeta meta = item.getItemMeta();
+        return meta.hasCustomModelData() && meta.getCustomModelData() == BOW_MODEL_ID;
+    }
+
+
+    private double applyArmor(double damage, double armor) {
+        if (armor <= 0) return damage;
+        // Beispiel-Formel: je mehr Armor, desto weniger Damage, aber mit abnehmendem Nutzen
+        double reduction = armor / (armor + 1000.0); // 1000 = "Skalierungs-Konstante"
+        double finalDmg = damage * (1.0 - reduction);
+        return Math.max(0.0, finalDmg);
+    }
+
+
 }

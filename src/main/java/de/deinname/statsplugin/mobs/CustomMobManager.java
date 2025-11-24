@@ -8,6 +8,9 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.entity.LivingEntity;
 
 public class CustomMobManager {
 
@@ -15,12 +18,19 @@ public class CustomMobManager {
     private final NamespacedKey KEY_MOB_ID;
     private final NamespacedKey KEY_MOB_LEVEL;
     private final NamespacedKey KEY_MOB_XP;
+    private final NamespacedKey KEY_MOB_MAX_HP;
+    private final NamespacedKey KEY_MOB_CUR_HP;
+    private final NamespacedKey KEY_MOB_ARMOR;
+
 
     public CustomMobManager(JavaPlugin plugin) {
         this.plugin = plugin;
         this.KEY_MOB_ID    = new NamespacedKey(plugin, "mmomob_id");
         this.KEY_MOB_LEVEL = new NamespacedKey(plugin, "mmomob_level");
         this.KEY_MOB_XP    = new NamespacedKey(plugin, "mmomob_xp");
+        this.KEY_MOB_MAX_HP = new NamespacedKey(plugin, "mmomob_max_hp");
+        this.KEY_MOB_CUR_HP = new NamespacedKey(plugin, "mmomob_cur_hp");
+        this.KEY_MOB_ARMOR  = new NamespacedKey(plugin, "mmomob_armor");
     }
 
     public NamespacedKey keyId()    { return KEY_MOB_ID; }
@@ -47,20 +57,21 @@ public class CustomMobManager {
             double spd  = type.speedAt(level);
             int xp      = type.xpAt(level);
 
-            setAttribute(le, Attribute.MAX_HEALTH, hp);
-            le.setHealth(hp);
+            setAttribute(le, Attribute.MAX_HEALTH, 20);
+            le.setHealth(20);
             setAttribute(le, Attribute.ATTACK_DAMAGE, dmg);
-            setAttribute(le, Attribute.ARMOR, arm);
+            //setAttribute(le, Attribute.ARMOR, 0.0);
             setAttribute(le, Attribute.MOVEMENT_SPEED, spd);
 
             PersistentDataContainer pdc = le.getPersistentDataContainer();
             pdc.set(KEY_MOB_ID,    PersistentDataType.STRING,  type.getId());
             pdc.set(KEY_MOB_LEVEL, PersistentDataType.INTEGER, level);
             pdc.set(KEY_MOB_XP,    PersistentDataType.INTEGER, xp);
+            pdc.set(KEY_MOB_MAX_HP,   PersistentDataType.DOUBLE,  hp);
+            pdc.set(KEY_MOB_CUR_HP,   PersistentDataType.DOUBLE,  hp);
+            pdc.set(KEY_MOB_ARMOR,    PersistentDataType.DOUBLE,  arm);
 
-            String name = "§7[§eLv. " + level + "§7] §r" + type.getDisplayName();
-            le.setCustomName(name);
-            le.setCustomNameVisible(true);
+            updateHpName(le);
         });
 
         if (entity instanceof LivingEntity le) {
@@ -91,4 +102,55 @@ public class CustomMobManager {
         Integer xp = le.getPersistentDataContainer().get(KEY_MOB_XP, PersistentDataType.INTEGER);
         return xp == null ? 0 : xp;
     }
+
+    public double getMaxHp(LivingEntity le) {
+        Double v = le.getPersistentDataContainer().get(KEY_MOB_MAX_HP, PersistentDataType.DOUBLE);
+        return v == null ? le.getAttribute(Attribute.MAX_HEALTH).getValue() : v;
+    }
+
+    public double getCurrentHp(LivingEntity le) {
+        Double v = le.getPersistentDataContainer().get(KEY_MOB_CUR_HP, PersistentDataType.DOUBLE);
+        if (v == null) return getMaxHp(le);
+        return v;
+    }
+
+    public void setCurrentHp(LivingEntity le, double value) {
+        double max = getMaxHp(le);
+        double clamped = Math.max(0.0, Math.min(max, value));
+        le.getPersistentDataContainer().set(KEY_MOB_CUR_HP, PersistentDataType.DOUBLE, clamped);
+    }
+
+    public double getArmor(LivingEntity le) {
+        Double v = le.getPersistentDataContainer().get(KEY_MOB_ARMOR, PersistentDataType.DOUBLE);
+        return v == null ? 0.0 : v;
+    }
+
+
+    public void updateHpName(LivingEntity mob) {
+        PersistentDataContainer pdc = mob.getPersistentDataContainer();
+
+        String id   = pdc.get(KEY_MOB_ID, PersistentDataType.STRING);
+        Integer lvl = pdc.get(KEY_MOB_LEVEL, PersistentDataType.INTEGER);
+
+        if (id == null || lvl == null) return;
+
+        CustomMobType type = getType(mob);
+        if (type == null) return;
+
+        double maxHp = getMaxHp(mob);
+        double hp    = getCurrentHp(mob);
+
+        int hpNow = (int) Math.ceil(hp);
+        int hpMax = (int) Math.ceil(maxHp);
+
+        String name =
+                "§7[§eLv. " + lvl + "§7] §r" +
+                        type.getDisplayName() +
+                        " §c" + hpNow + "§7/§c" + hpMax;
+
+        mob.setCustomName(name);
+        mob.setCustomNameVisible(true);
+    }
+
+
 }

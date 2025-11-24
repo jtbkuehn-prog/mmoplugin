@@ -21,6 +21,10 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
+import net.kyori.adventure.key.Key;
+import net.kyori.adventure.text.format.TextColor;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.TextDecoration;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -32,10 +36,32 @@ public class ItemAdminCommand implements CommandExecutor, TabCompleter {
     private final ManaManager mana;
     private final ItemStatKeys keys;
     private final ItemRarityManager rarityMgr;
+    private static final Key FONT_ICONS = Key.key("minecraft:icons");
+
+
+    private Component icon(String glyph, TextColor color) {
+        return Component.text(glyph)
+                .font(FONT_ICONS)                       // <<< HIER wird die Font gesetzt
+                .color(color)
+                .decoration(TextDecoration.ITALIC, false);
+    }
+
 
     // PDC-Schlüssel für Rarity + Custom-Lore
     private final NamespacedKey KEY_RARITY;
     private final NamespacedKey KEY_CUSTOM_LORE;
+    private static final String ICON_DAMAGE = "\uE001";
+    private static final String ICON_CRITCHANCE = "\uE002";
+    private static final String ICON_CRITDAMAGE = "\uE003";
+    private static final String ICON_ATTACKSPEED = "\uE004";
+    private static final String ICON_RANGE = "\uE005";
+    private static final String ICON_HEALTH = "\uE006";
+    private static final String ICON_HEALTHREGEN = "\uE007";
+    private static final String ICON_ARMOR = "\uE008";
+    private static final String ICON_MANA = "\uE009";
+    private static final String ICON_MANAREGEN = "\uE010";
+    private static final String ICON_SPEED = "\uE011";
+
 
     public ItemAdminCommand(JavaPlugin plugin, StatsManager stats, ManaManager mana, ItemStatKeys keys) {
         this.plugin = plugin;
@@ -352,47 +378,47 @@ public class ItemAdminCommand implements CommandExecutor, TabCompleter {
         if (is == null || !is.hasItemMeta()) return;
         ItemMeta meta = is.getItemMeta();
 
+        // Vanilla-Attribute verstecken
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
         meta.setAttributeModifiers(null);
 
+        // Stats einlesen
         ItemStats s = ItemStatUtils.read(is, keys);
-        List<Component> lore = new ArrayList<>();
 
+        // Farben aus Config
         TextColor colDamage      = loreColor("damage",      "#FF5555");
-        TextColor colCritChance  = loreColor("critchance",  "#55FFFF");
-        TextColor colCritDamage  = loreColor("critdamage",  "#FFD700");
+        TextColor colCritChance  = loreColor("critchance",  "#FFFF55");
+        TextColor colCritDamage  = loreColor("critdamage",  "#FFAA00");
         TextColor colHealth      = loreColor("health",      "#FF5555");
         TextColor colArmor       = loreColor("armor",       "#AAAAAA");
-        TextColor colRange       = loreColor("range",       "#55FF55");
-        TextColor colMana        = loreColor("mana",        "#00AAFF");
-        TextColor colManaRegen   = loreColor("manaregen",   "#00AAFF");
-        TextColor colHealthRegen = loreColor("healthregen", "#FF7777");
-        TextColor colAttackspeed = loreColor("attackspeed", "#FF7777");
+        TextColor colRange       = loreColor("range",       "#00AAA");
+        TextColor colMana        = loreColor("mana",        "#55FFFF");
+        TextColor colManaRegen   = loreColor("manaregen",   "#55FFFF");
+        TextColor colHealthRegen = loreColor("healthregen", "#FF5555");
+        TextColor colAttackspeed = loreColor("attackspeed", "#FF55FF");
         TextColor colSpeed       = loreColor("speed",       "#FFFFFF");
         TextColor colCustom      = loreColor("custom",      "#BFBFBF");
+        TextColor colBlau        = loreColor("custom",      "#5555FF");
 
-        addLineColored(lore, s.damage(),      "+%s Damage",              colDamage);
-        addLineColored(lore, s.critChance(),  "+%s%% Crit Chance",       colCritChance);
-        addLineColored(lore, s.critDamage(),  "+%s%% Crit Damage",       colCritDamage);
-        addLineColored(lore, s.health(),      "+%s Health",              colHealth);
-        addLineColored(lore, s.armor(),       "+%s Armor",               colArmor);
-        addLineColored(lore, s.range(),       "+%s Range",               colRange);
-        addLineColored(lore, s.manaMax(),     "+%s Mana",                colMana);
-        addLineColored(lore, s.manaRegen(),   "+%s Mana Regeneration/s", colManaRegen);
-        addLineColored(lore, s.healthRegen(), "+%s Health Regeneration/s", colHealthRegen);
-        addLineColored(lore, s.attackspeed(), "+%s Attackspeed/s",       colAttackspeed);
-        addLineColored(lore, s.speed(),       "+%s Speed",               colSpeed);
+        // 1) Stats-Lore in Liste bauen – Reihenfolge & Namen frei anpassbar
+        List<Component> statsLore = new ArrayList<>();
 
-        List<String> customLines = readCustomLore(meta.getPersistentDataContainer());
-        if (!customLines.isEmpty()) {
-            lore.add(Component.text("").decoration(TextDecoration.ITALIC, false));
-            for (String line : customLines) {
-                lore.add(Component.text(line)
-                        .color(colCustom)
-                        .decoration(TextDecoration.ITALIC, false));
-            }
-        }
 
+
+        addFancyStatLine(statsLore, s.damage(),      ICON_DAMAGE, colDamage,"Damage", NamedTextColor.GRAY, NamedTextColor.BLUE);
+        addFancyStatLine(statsLore, s.critChance(),      ICON_CRITCHANCE, colCritChance,"Crit Chance", NamedTextColor.GRAY, NamedTextColor.BLUE);
+        addFancyStatLine(statsLore, s.critDamage(),      ICON_CRITDAMAGE, colCritDamage,"Crit Damage", NamedTextColor.GRAY, NamedTextColor.BLUE);
+        addFancyStatLine(statsLore, s.attackspeed(),      ICON_ATTACKSPEED, colAttackspeed,"Attackspeed", NamedTextColor.GRAY, NamedTextColor.BLUE);
+        addFancyStatLine(statsLore, s.range(),      ICON_RANGE, colRange,"Reach", NamedTextColor.GRAY, NamedTextColor.BLUE);
+        addFancyStatLine(statsLore, s.health(),      ICON_HEALTH, colHealth,"Health", NamedTextColor.GRAY, NamedTextColor.BLUE);
+        addFancyStatLine(statsLore, s.healthRegen(),      ICON_HEALTHREGEN, colHealthRegen,"Health Regen", NamedTextColor.GRAY, NamedTextColor.BLUE);
+        addFancyStatLine(statsLore, s.armor(),      ICON_ARMOR, colArmor,"Armor", NamedTextColor.GRAY, NamedTextColor.BLUE);
+        addFancyStatLine(statsLore, s.manaMax(),      ICON_MANA, colMana,"Mana", NamedTextColor.GRAY, NamedTextColor.BLUE);
+        addFancyStatLine(statsLore, s.manaRegen(),      ICON_MANAREGEN, colManaRegen,"Mana Regen", NamedTextColor.GRAY, NamedTextColor.BLUE);
+        addFancyStatLine(statsLore, s.speed(),      ICON_SPEED, colSpeed,"Speed", NamedTextColor.GRAY, NamedTextColor.BLUE);    //🐇 <-- oder das
+
+
+        // 2) Name-Farbe (Rarity/Hex) anwenden
         TextColor nameColor = resolveStoredColor(meta.getPersistentDataContainer());
         if (nameColor != null) {
             String plainName = meta.hasDisplayName()
@@ -402,20 +428,79 @@ public class ItemAdminCommand implements CommandExecutor, TabCompleter {
                     .decoration(TextDecoration.ITALIC, false));
         }
 
-        meta.lore(lore);
+        // Erstmal NUR Stats als Lore setzen
+        meta.lore(statsLore);
         is.setItemMeta(meta);
 
-        // Ability-Block anhängen (wenn vorhanden)
+        // 3) Ability-Lore anhängen (arbeitet direkt auf dem Item)
         de.deinname.statsplugin.abilities.AbilityLore.appendAbilityLore(is, keys);
+
+        // 4) Custom-Lore (addlore) GANZ UNTEN anhängen
+
+        // Custom-Lore-Strings aus PDC lesen (wie bisher)
+        List<String> customLines = readCustomLore(meta.getPersistentDataContainer());
+
+        if (!customLines.isEmpty()) {
+            // Aktuelle Lore nach Ability nochmal holen
+            meta = is.getItemMeta();
+            List<Component> finalLore = meta.hasLore()
+                    ? new ArrayList<>(meta.lore())
+                    : new ArrayList<>();
+
+            // Leerzeile als Trenner
+            finalLore.add(Component.text("").decoration(TextDecoration.ITALIC, false));
+
+            // Custom-Lines farbig + nicht kursiv dranhängen
+            for (String line : customLines) {
+                finalLore.add(Component.text(line)
+                        .color(colCustom)
+                        .decoration(TextDecoration.ITALIC, false));
+            }
+
+            meta.lore(finalLore);
+            is.setItemMeta(meta);
+        }
     }
 
-    private void addLineColored(List<Component> lore, double v, String fmt, TextColor color) {
-        if (Math.abs(v) < 1e-9) return;
-        String txt = formatNumber(v, fmt);
-        lore.add(Component.text(txt)
-                .color(color)
-                .decoration(TextDecoration.ITALIC, false));
+
+    private void addFancyStatLine(List<Component> lore,
+                                  double value,
+                                  String iconGlyph,
+                                  TextColor iconColor,
+                                  String statName,
+                                  TextColor nameColor,
+                                  TextColor valueColor) {
+
+        if (Math.abs(value) < 1e-9) return;
+
+        boolean isInt = Math.abs(value - Math.rint(value)) < 1e-9;
+        String num = isInt
+                ? String.valueOf((int) Math.rint(value))
+                : String.valueOf(Math.round(value * 10) / 10.0);
+
+        Component line = Component.text()
+                // Icon mit eigener Font
+                .append(icon(iconGlyph, iconColor))
+                .append(Component.text(" ")
+                        .decoration(TextDecoration.ITALIC, false))
+
+                // „Damage: “ in Grau
+                .append(Component.text(statName + ": ")
+                        .color(nameColor)
+                        .decoration(TextDecoration.ITALIC, false))
+
+                // „+10“ in Stat-Farbe
+                .append(Component.text("+" + num)
+                        .color(valueColor)
+                        .decoration(TextDecoration.ITALIC, false))
+                .build();
+
+        lore.add(line);
     }
+
+
+
+
 
     private String formatNumber(double v, String fmt) {
         boolean isInt = Math.abs(v - Math.rint(v)) < 1e-9;
@@ -465,7 +550,7 @@ public class ItemAdminCommand implements CommandExecutor, TabCompleter {
             return rarityMgr.names().stream().map(String::toLowerCase).collect(Collectors.toList());
         }
         if (args.length == 2 && "setability".equalsIgnoreCase(args[0])) {
-            return Arrays.asList("damage_boost"); // erweiterbar
+            return Arrays.asList("damage_boost", "explosive_arrow","mage_beam"); // erweiterbar
         }
         return List.of();
     }

@@ -1,38 +1,61 @@
 package de.deinname.statsplugin;
 
-import de.deinname.statsplugin.commands.StatsCommand;
+import de.deinname.statsplugin.abilities.ExplosiveArrowAbility;
+import de.deinname.statsplugin.commands.*;
+import de.deinname.statsplugin.dungeons.DungeonChestListener;
+import de.deinname.statsplugin.dungeons.DungeonManager;
+import de.deinname.statsplugin.dungeons.DungeonStartCommand;
 import de.deinname.statsplugin.listeners.*;
+import de.deinname.statsplugin.party.PartyManager;
+import org.bukkit.Bukkit;
 import org.bukkit.GameRule;
+import org.bukkit.NamespacedKey;
 import org.bukkit.World;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import de.deinname.statsplugin.util.DamageNumbers;
 import de.deinname.statsplugin.abilities.AbilityListener;
 import de.deinname.statsplugin.abilities.DamageBoostState;
-import de.deinname.statsplugin.commands.ItemAdminCommand;
 import de.deinname.statsplugin.items.ItemStatKeys;
 import de.deinname.statsplugin.mana.ManaManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import de.deinname.statsplugin.mobs.CustomMobManager;
-import de.deinname.statsplugin.commands.MobSpawnCommand;
+import de.deinname.statsplugin.loot.LootTableManager;
+import de.deinname.statsplugin.loot.LootListener;
+import de.deinname.statsplugin.listeners.ItemTemplateGuiListener;
 
+import java.util.Objects;
 
 
 public class StatsPlugin extends JavaPlugin {
     private StatsManager statsManager;
     private StatsStorage storage;
     private DamageNumbers damageNumbers;
+    public static DungeonManager dungeonManager;
+    private PartyManager partyManager;
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
+        createDungeonWorld();
 
         storage = new StatsStorage(this);
         statsManager = new StatsManager();
         statsManager.setStorage(storage);
         damageNumbers = new DamageNumbers(this);
         CustomMobManager mobManager = new CustomMobManager(this);
+        LootTableManager lootManager = new LootTableManager(this);
+        ItemTemplateCommand itemTplCmd = new ItemTemplateCommand(this);
+        dungeonManager = new DungeonManager(this, mobManager, lootManager);
+        partyManager = new PartyManager(this);
+
+
+        var tplCmd = new ItemTemplateCommand(this);
+        getCommand("itemtpl").setExecutor(itemTplCmd);
+        getCommand("itemtpl").setTabCompleter(itemTplCmd);
+
 
         ItemStatKeys itemKeys = new ItemStatKeys(this);
         ManaManager manaManager = new ManaManager(this);
@@ -48,13 +71,20 @@ public class StatsPlugin extends JavaPlugin {
 
         // Listener
         getServer().getPluginManager().registerEvents(new PlayerListener(statsManager), this);
-        getServer().getPluginManager().registerEvents(new DamageListener(statsManager, damageNumbers, mobManager), this);
-        getServer().getPluginManager().registerEvents(new AttackListener(statsManager, damageNumbers), this);
+        getServer().getPluginManager().registerEvents(new DamageListener(statsManager, damageNumbers, mobManager, this), this);
+        AttackListener attackListener = new AttackListener(statsManager, damageNumbers, mobManager);getServer().getPluginManager().registerEvents(attackListener, this);
         getServer().getPluginManager().registerEvents(new XPListener(this, statsManager, mobManager), this);
         getServer().getPluginManager().registerEvents(new ItemRecalcListener(this, statsManager, manaManager, itemKeys), this);
         getServer().getPluginManager().registerEvents(new AbilityListener(this, manaManager, itemKeys), this);
         getServer().getPluginManager().registerEvents(new DamageBoostState(), this);
         getServer().getPluginManager().registerEvents(new FoodAndRegenListener(), this);
+        getServer().getPluginManager().registerEvents(new LootListener(this, lootManager, mobManager), this);
+        getServer().getPluginManager().registerEvents(new ItemTemplateGuiListener(this), this);
+        getServer().getPluginManager().registerEvents(new ExplosiveArrowAbility(this, manaManager, itemKeys, statsManager, damageNumbers, mobManager), this);
+        getServer().getPluginManager().registerEvents(new BowForceListener(this), this);
+        getServer().getPluginManager().registerEvents(new DungeonChestListener(this, lootManager,
+                        dungeonManager.getDungeonChestKey(), dungeonManager.getDungeonChestRolledKey()), this);
+
 
 
         // Commands
@@ -76,6 +106,26 @@ public class StatsPlugin extends JavaPlugin {
         getCommand("mobspawn").setExecutor(mobCmd);
         getCommand("mobspawn").setTabCompleter(mobCmd);
 
+        Objects.requireNonNull(getCommand("party"))
+                .setExecutor(new PartyCommand(partyManager));
+
+        // NEU in onEnable:
+        Objects.requireNonNull(getCommand("dungeonstart"))
+                .setExecutor(new DungeonStartCommand(dungeonManager, partyManager));
+
+
+        getCommand("leavedungeon").setExecutor((sender, cmd, lbl, args) -> {
+            if (!(sender instanceof Player p)) return true;
+
+            dungeonManager.returnPlayer(p);
+            p.sendMessage("§aDu hast den Dungeon verlassen.");
+
+            return true;
+        });
+
+
+
+
 
         // HUD & Ticks (alle 10 Ticks = 0,5s)
         // HUD & Ticks (alle 10 Ticks = 0,5s)
@@ -85,6 +135,7 @@ public class StatsPlugin extends JavaPlugin {
                 if (!p.isOnline() || p.isDead()) {
                     continue;
                 }
+                statsManager.applyNoVanillaCooldown(p);
 
                 // Stats & Mana holen
                 PlayerStats stats = statsManager.getStats(p);
@@ -160,6 +211,8 @@ public class StatsPlugin extends JavaPlugin {
                         .build();
 
                 p.sendActionBar(bar);
+
+
             }
         }, 0L, 10L);
 
@@ -176,6 +229,8 @@ public class StatsPlugin extends JavaPlugin {
         PlayerLevel.configure(max, base, mult);
 
         getLogger().info("StatsPlugin aktiviert! Spieler: " + statsManager.getPlayerCount());
+
+
     }
 
     @Override
@@ -185,4 +240,28 @@ public class StatsPlugin extends JavaPlugin {
     }
 
     public StatsManager getStatsManager() { return statsManager; }
+
+    private void createDungeonWorld() {
+        String worldName = "dungeons_world";
+
+        if (getServer().getWorld(worldName) != null) {
+            getLogger().info("[Dungeons] Welt '" + worldName + "' existiert bereits.");
+            return;
+        }
+
+        getLogger().info("[Dungeons] Erstelle Void-Welt '" + worldName + "'...");
+
+        org.bukkit.WorldCreator creator = new org.bukkit.WorldCreator(worldName);
+        creator.environment(org.bukkit.World.Environment.NORMAL);
+        creator.generator(new de.deinname.statsplugin.world.VoidChunkGenerator());
+        creator.generateStructures(false);
+
+        org.bukkit.World world = creator.createWorld();
+        if (world != null) {
+            world.setSpawnLocation(0, 64, 0);
+            getLogger().info("[Dungeons] Welt '" + worldName + "' erstellt.");
+        } else {
+            getLogger().warning("[Dungeons] Konnte Welt '" + worldName + "' nicht erstellen!");
+        }
+    }
 }

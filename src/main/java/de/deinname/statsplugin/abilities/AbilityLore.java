@@ -3,6 +3,7 @@ package de.deinname.statsplugin.abilities;
 import de.deinname.statsplugin.items.ItemStatKeys;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataContainer;
@@ -43,25 +44,34 @@ public final class AbilityLore {
         // gap
         lore.add(Component.text(""));
 
-        // NAME + RIGHT CLICK
+        // Click-Hinweis abhängig vom Typ
+        String clickHint = id.equalsIgnoreCase("explosive_arrow")
+                ? " (LEFT CLICK)"
+                : " (RIGHT CLICK)";
+
+// NAME + Click-Hinweis
         lore.add(Component.text()
-                .append(Component.text("Ability: ", NamedTextColor.GOLD))
-                .append(Component.text(def.getDisplayName(), NamedTextColor.YELLOW))
-                .append(Component.text(" (RIGHT CLICK)", NamedTextColor.GRAY))
+                .append(Component.text("Ability: ", NamedTextColor.GOLD)
+                        .decoration(TextDecoration.ITALIC, false))
+                .append(Component.text(def.getDisplayName(), NamedTextColor.YELLOW)
+                        .decoration(TextDecoration.ITALIC, false))
+                .append(Component.text(clickHint, NamedTextColor.GRAY)
+                        .decoration(TextDecoration.ITALIC, false))
                 .build());
 
+
         // DESCRIPTION
-        lore.add(Component.text(def.getDescription(), NamedTextColor.GRAY));
+        lore.add(Component.text(def.getDescription(), NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
 
         // MANA & COOLDOWN
         lore.add(Component.text()
-                .append(Component.text("Mana: ", NamedTextColor.AQUA))
-                .append(Component.text(String.valueOf(mana), NamedTextColor.AQUA))
-                .append(Component.text("   Cooldown: ", NamedTextColor.DARK_GRAY))
+                .append(Component.text("Mana: ", NamedTextColor.AQUA).decoration(TextDecoration.ITALIC, false))
+                .append(Component.text(String.valueOf(mana), NamedTextColor.AQUA).decoration(TextDecoration.ITALIC, false))
+                .append(Component.text("   Cooldown: ", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false))
                 .append(Component.text(
                         String.format(Locale.US, "%.1fs", cooldown),
                         NamedTextColor.GREEN
-                ))
+                ).decoration(TextDecoration.ITALIC, false))
                 .build());
 
         meta.lore(lore);

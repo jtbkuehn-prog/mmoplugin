@@ -10,6 +10,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.entity.Player;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
+import org.bukkit.entity.Player;
 
 
 public class StatsManager {
@@ -39,6 +42,14 @@ public class StatsManager {
             }
             return new PlayerStats(uuid);
         });
+    }
+    public void applyNoVanillaCooldown(Player p) {
+        AttributeInstance attr = p.getAttribute(Attribute.ATTACK_SPEED);
+        if (attr == null) return;
+
+        // Standard ist 4.0 – je höher, desto kürzer der Vanilla-Cooldown.
+        // 1024.0 => praktisch instant voll.
+        attr.setBaseValue(1024.0);
     }
 
     // Lädt oder erstellt Level für einen Spieler

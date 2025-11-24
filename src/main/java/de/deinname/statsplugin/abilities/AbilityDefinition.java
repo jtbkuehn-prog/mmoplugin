@@ -8,8 +8,15 @@ public enum AbilityDefinition {
     DAMAGE_BOOST(
             "damage_boost",
             "Damage Boost",
-            "Erhöht deinen Schaden für kurze Zeit um 50%."
+            "Increases your damage by 50% for a short duration."
+    ),
+    // 🔥 NEU: Explosive Arrow
+    EXPLOSIVE_ARROW(
+                "explosive_arrow",
+                    "Explosive Arrow",
+                    "Fires an explosive arrow that causes 200% area damage on impact."
     );
+
 
     private final String id;
     private final String displayName;

@@ -30,6 +30,25 @@ commands:
     permission: stats.admin
     permission-message: §cKeine Rechte.
 
+  itemtpl:
+    description: "Verwalte gespeicherte Item-Vorlagen"
+    usage: "/itemtpl save|give|list|delete"
+    permission: "stats.itemtpl"
+    permission-message: "§cDu hast keine Berechtigung für diesen Befehl."
+
+  dungeonstart:
+    description: Erstellt eine Dungeon-Instanz und teleportiert dich hinein
+    usage: /dungeonstart
+    permission: stats.dungeonstart
+
+
+  party:
+    description: Party-System
+    usage: /party
+
+  leavedungeon:
+    description: Leave active dungeon
+
 permissions:
   stats.use:
     description: Erlaubt das Anzeigen von Stats
